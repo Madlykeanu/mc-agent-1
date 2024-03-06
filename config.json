@@ -1,0 +1,24 @@
+{
+  "bot": {
+    "username": "ChatBotAI",
+    "host": "play.earthvision.eu",
+    "port": 25565
+  },
+  "languageModel": {
+    "url": "http://192.168.1.75:1000/v1/chat/completions",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "defaultPayload": {
+      "model": "Deepseekcoder-7b",
+      "max_tokens": 1024,
+      "stream": true
+    }
+  },
+  "systemMessages": [
+    {
+      "role": "system",
+      "content": "Always answer in rhymes."
+    }
+  ]
+}
