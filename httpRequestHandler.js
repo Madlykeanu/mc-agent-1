@@ -13,7 +13,7 @@ async function sendPostRequest(url, payload) {
                 'Content-Type': 'application/json',
             },
         });
-        console.log('Response data:', response.data); // Print the response data
+        //console.log('Response data:', response.data); // Print the response data
         return response.data; // axios wraps the response data in a 'data' property
     } catch (error) {
         // axios encapsulates errors in an 'error.response' object
