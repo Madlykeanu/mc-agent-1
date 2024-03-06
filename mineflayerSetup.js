@@ -9,10 +9,11 @@ const configPath = path.join(__dirname, 'config.json');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
 let bot = mineflayer.createBot({
-    host: 'play.earthvision.eu',
+    host: 'play.earthvision.eu', // Minecraft server IP
     //host: 'play.ccnetmc.com', // Minecraft server IP
     port: 25565,       // server port, 25565 by default
     username: 'madlykeanu@gmail.com', // Your Mojang or Microsoft account email
+    //username: 'filthyfrank128@gmail.com',
     auth: 'microsoft', // Use 'mojang' for Mojang accounts, 'microsoft' for Microsoft accounts
     version: '1.20.2'
   });
@@ -21,7 +22,7 @@ let bot = mineflayer.createBot({
 bot.on('spawn', () => {
     // Wait 2 seconds before sending the command to change server
     setTimeout(() => {
-        bot.chat('/server phoenix');
+        bot.chat('/server earth');
     }, 2000);
 });
 
@@ -45,7 +46,7 @@ bot.on('chat', async (username, message) => {
         // Construct the payload according to the curl example
         const payload = {
           messages: [
-            { role: 'system', content: 'your playing on a minecraft server with your bros and you cant stop telling everyone how epic and thicc shrek is. keep responses very short. dont use expressions like *winks* *roars* etc' },
+            { role: 'system', content: 'your playing on a minecraft server with your bros and you love shrek is. keep responses very short. dont use expressions like *winks* *roars* etc' },
             { role: 'user', content: message } // Use the actual message received from chat
           ],
           temperature: 0.7,
