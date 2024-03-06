@@ -23,7 +23,7 @@ bot.on('chat', async (username, message) => {
     // Construct the payload according to the curl example
     const payload = {
       messages: [
-        { role: 'system', content: 'your playing on a minecraft server, only answer every once in a while, answer like your in the server and chatting with the other players' },
+        { role: 'system', content: 'respond like your playing on a minecraft server with your bros, keep the responses casual' },
         { role: 'user', content: message } // Use the actual message received from chat
       ],
       temperature: 0.7,
