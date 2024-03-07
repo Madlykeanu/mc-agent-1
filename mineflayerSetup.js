@@ -2,7 +2,6 @@ const mineflayer = require('mineflayer');
 const fs = require('fs');
 const path = require('path');
 const httpRequestHandler = require('./httpRequestHandler');
-const payloadBuilder = require('./payloadBuilder');
 const readline = require('readline');
 // Load configuration
 const configPath = path.join(__dirname, 'config.json');
@@ -10,78 +9,95 @@ const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
 let bot = mineflayer.createBot({
     host: 'play.earthvision.eu', // Minecraft server IP
-    //host: 'play.ccnetmc.com', // Minecraft server IP
     port: 25565,       // server port, 25565 by default
     username: 'madlykeanu@gmail.com', // Your Mojang or Microsoft account email
-    //username: 'filthyfrank128@gmail.com',
     auth: 'microsoft', // Use 'mojang' for Mojang accounts, 'microsoft' for Microsoft accounts
     version: '1.20.2'
-  });
+});
+
+// Flag to determine if the bot should respond to messages
+let canRespondToMessages = false;
+
+// Store the last messages sent by the bot
+let lastSentMessages = [];
 
 // Listen for the spawn event
 bot.on('spawn', () => {
-    // Wait 2 seconds before sending the command to change server
+    // Wait 5 seconds before allowing the bot to respond to messages
     setTimeout(() => {
-        bot.chat('/server earth');
-    }, 2000);
+        canRespondToMessages = true;
+    }, 5000);
 });
 
-let messageCount = 0; // Initialize message counter
+// Listen for chat messages using 'message' event
+bot.on('message', async (jsonMsg) => {
+    console.log(`Received message: ${jsonMsg.toString()}`); // Print all messages to console
 
-// Listen for chat messages
-bot.on('chat', async (username, message) => {
-    console.log(`Message from ${username}: ${message}`); // Add this line for debugging// Ignore messages from the bot itself
-    if (username === bot.username) return;
-    
-    console.log(`Message from ${username}: ${message}`); // Add this line for debugging// Ignore messages from the bot itself
-  
-    // Increment the message counter
-    messageCount++;
+    // If the bot is not allowed to respond to messages yet, return early
+    if (!canRespondToMessages) return;
 
-    // Check if 3 messages have been received
-    if (messageCount >= 5) {
-        // Reset the message counter
-       
+    const message = jsonMsg.toString();
 
-        // Construct the payload according to the curl example
-        const payload = {
-          messages: [
-            { role: 'system', content: 'your playing on a minecraft server with your bros and you love shrek is. keep responses very short. dont use expressions like *winks* *roars* etc' },
-            { role: 'user', content: message } // Use the actual message received from chat
-          ],
-          temperature: 0.7,
-          max_tokens: -1,
-          stream: false
-        };
-  
-        try {
-          // Send the POST request with the constructed payload
-          const response = await httpRequestHandler.sendPostRequest(config.languageModel.url, payload);
-          //console.log(response); // Log the response for debugging
-  
-          // Here's where you should place the provided code snippet
-          if (response.choices && response.choices.length > 0 && response.choices[0].message) {
-              const messageContent = response.choices[0].message.content;
-              if (messageContent) {
-                  const responseText = messageContent.trim();
-                  // Delay sending the response by 4 seconds
-                  setTimeout(() => {
-                      bot.chat(responseText);
-                      console.log(`Bot response: ${responseText}`); // Add this line to print the bot's response
-                  }, 2000);
-              } else {
-                  console.error('Message content is undefined');
-              }
-          } else {
-              console.error('Invalid response structure:', response);
-          }
-        } catch (error) {
-          console.error('Error handling chat message:', error);
-          bot.chat("Oops, I ran into an issue trying to respond.");
+    // Check if the message includes 'ppmoment'
+    if (!message.includes('ppmoment')) {
+        // If it doesn't, do not process this message further
+        return;
+    }
+
+    // Check if the message is from the bot itself by looking for "ppmoment:"
+    if (message.includes('ppmoment:')) {
+        // If it is, do not process this message further
+        return;
+    }
+
+    // Check if the message is one the bot has sent recently
+    if (lastSentMessages.includes(message)) {
+        // If it is, remove it from the array and do not respond
+        lastSentMessages = lastSentMessages.filter(m => m !== message);
+        return;
+    }
+
+    // Construct the payload for every message received
+    const payload = {
+        messages: [
+            { role: 'system', content: 'your playing on a minecraft server with your bros. the server is earthmc and you love it very much. your username is ppmoment. keep responses very short.' },
+            { role: 'user', content: message }
+        ],
+        temperature: 0.7,
+        max_tokens: -1,
+        stream: false
+    };
+
+    try {
+        // Send the POST request with the constructed payload
+        const response = await httpRequestHandler.sendPostRequest(config.languageModel.url, payload);
+
+        if (response.choices && response.choices.length > 0 && response.choices[0].message) {
+                       const messageContent = response.choices[0].message.content;
+            if (messageContent) {
+                const responseText = messageContent.trim();
+                // Delay sending the response by 3 seconds
+                setTimeout(() => {
+                    bot.chat(responseText);
+                    console.log(`Bot response: ${responseText}`); // Add this line to print the bot's response
+                    // Add the message to the array of last sent messages
+                    lastSentMessages.push(responseText);
+                    // Optionally, limit the size of the array to the last X messages
+                    if (lastSentMessages.length > 10) { // for example, keep only last 10 messages
+                        lastSentMessages.shift(); // remove the oldest message
+                    }
+                }, 3000);
+            } else {
+                console.error('Message content is undefined');
+            }
+        } else {
+            console.error('Invalid response structure:', response);
         }
+    } catch (error) {
+        console.error('Error handling chat message:', error);
+        bot.chat("Oops, I ran into an issue trying to respond.");
     }
 });
-
 // Setup readline interface for terminal input
 const rl = readline.createInterface({
   input: process.stdin,
