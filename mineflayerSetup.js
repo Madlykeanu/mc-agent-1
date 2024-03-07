@@ -8,7 +8,7 @@ const configPath = path.join(__dirname, 'config.json');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
 let bot = mineflayer.createBot({
-    host: 'play.earthvision.eu', // Minecraft server IP
+    host: '2b2t.org', // Minecraft server IP
     port: 25565,       // server port, 25565 by default
     username: 'madlykeanu@gmail.com', // Your Mojang or Microsoft account email
     auth: 'microsoft', // Use 'mojang' for Mojang accounts, 'microsoft' for Microsoft accounts
@@ -17,6 +17,7 @@ let bot = mineflayer.createBot({
 
 // Flag to determine if the bot should respond to messages
 let canRespondToMessages = false;
+let ignoreNextPpmomentMessage = true;
 
 // Store the last messages sent by the bot
 let lastSentMessages = [];
@@ -26,7 +27,7 @@ bot.on('spawn', () => {
     // Wait 5 seconds before allowing the bot to respond to messages
     setTimeout(() => {
         canRespondToMessages = true;
-    }, 5000);
+    }, 10000);
 });
 
 // Listen for chat messages using 'message' event
@@ -44,11 +45,11 @@ bot.on('message', async (jsonMsg) => {
         return;
     }
 
-    // Check if the message is from the bot itself by looking for "ppmoment:"
-    if (message.includes('ppmoment:')) {
-        // If it is, do not process this message further
-        return;
-    }
+    // Check if the message is from the bot itself by looking for "ppmoment:" or "<ppmoment>"
+    if (message.includes('ppmoment:') || message.includes('<ppmoment>')) {
+      // If it is, do not process this message further
+      return;
+  }
 
     // Check if the message is one the bot has sent recently
     if (lastSentMessages.includes(message)) {
@@ -60,11 +61,11 @@ bot.on('message', async (jsonMsg) => {
     // Construct the payload for every message received
     const payload = {
         messages: [
-            { role: 'system', content: 'your playing on a minecraft server with your bros. the server is earthmc and you love it very much. your username is ppmoment. keep responses very short.' },
+            { role: 'system', content: 'your name is ppmoment, your playing on a minecraft server called earthvision with your bros.you love the server very much. keep responses short. dont use emojis' },
             { role: 'user', content: message }
         ],
         temperature: 0.7,
-        max_tokens: -1,
+        max_tokens: 500,
         stream: false
     };
 
