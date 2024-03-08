@@ -8,7 +8,7 @@ const configPath = path.join(__dirname, 'config.json');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
 let bot = mineflayer.createBot({
-    host: '2b2t.org', // Minecraft server IP
+    host: 'localhost', // Minecraft server IP
     port: 25565,       // server port, 25565 by default
     username: 'madlykeanu@gmail.com', // Your Mojang or Microsoft account email
     auth: 'microsoft', // Use 'mojang' for Mojang accounts, 'microsoft' for Microsoft accounts
@@ -39,17 +39,18 @@ bot.on('message', async (jsonMsg) => {
 
     const message = jsonMsg.toString();
 
-    // Check if the message includes 'ppmoment'
-    if (!message.includes('ppmoment')) {
-        // If it doesn't, do not process this message further
+    // Check if the message includes 'ppmoment' or 'pp'
+    if (!message.includes('ppmoment') && !message.includes('pp')) {
+        // If it doesn't include either, do not process this message further
         return;
     }
 
+
     // Check if the message is from the bot itself by looking for "ppmoment:" or "<ppmoment>"
-    if (message.includes('ppmoment:') || message.includes('<ppmoment>')) {
+    if (message.includes('ppmoment:') || message.includes('<ppmoment>') || message.includes('/hub')) {
       // If it is, do not process this message further
       return;
-  }
+    }
 
     // Check if the message is one the bot has sent recently
     if (lastSentMessages.includes(message)) {
@@ -61,11 +62,11 @@ bot.on('message', async (jsonMsg) => {
     // Construct the payload for every message received
     const payload = {
         messages: [
-            { role: 'system', content: 'your name is ppmoment, your playing on a minecraft server called earthvision with your bros.you love the server very much. keep responses short. dont use emojis' },
+            { role: 'system', content: 'your name is ppmoment. keep responses very short. your playing on a minecraft server called earthvision. you like swearing' },
             { role: 'user', content: message }
         ],
         temperature: 0.7,
-        max_tokens: 500,
+        max_tokens: 200,
         stream: false
     };
 
