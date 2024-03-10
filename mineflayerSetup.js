@@ -5,8 +5,7 @@ const httpRequestHandler = require('./httpRequestHandler');
 const readline = require('readline');
 // Load configuration
 const configPath = path.join(__dirname, 'config.json');
-const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-
+const config = JSON.parse(fs.readFileSync(configPath, 'utf8')); 
 let bot = mineflayer.createBot({
     host: 'localhost', // Minecraft server IP (change this to your server's IP)
     port: 25565,       // server port, 25565 by default
@@ -20,7 +19,7 @@ let canRespondToMessages = false;
 let ignoreNextPpmomentMessage = true;
 let lastMentionedPlayers = {}; // New structure to track mentions
 let lastSentMessages = []; // Track the last 5 messages sent by the bot
-let respondToMentionsOnly = true; // False enables response to players within 5s without mention
+let respondToMentionsOnly = false; // False enables response to players within 5s without mention
 let respondToAllMessages = false; // Add this flag at the top with other flags
 let lastMessageTime = 0; // Initialize with 0 to track the timestamp of the last message sent
 
@@ -34,6 +33,7 @@ bot.on('spawn', () => {
 
 // Initialize the message history array at the top with other flags
 let messageHistory = [];
+
 
 bot.on('message', async (jsonMsg) => {
     if (!canRespondToMessages) return;
@@ -98,7 +98,7 @@ bot.on('message', async (jsonMsg) => {
             messages: [
                 { 
                     role: 'system', 
-                    content: `your name is ppmoment. keep responses as short as possible. you're playing on a Minecraft server you love called earthvision. you like to swear occasionally. do NOT use *, quotes, or emojis in your responses. here is the message history from the previous messages you and other players have sent you can use as context: ${messageHistoryString}`
+                    content: `your name is ppmoment. keep responses as short as possible. youre playing on a Minecraft server you love called earthvision. you like to swear occasionally. do NOT use *, quotes, or emojis in your responses.  here are the commands you have access to: ("/tpa {playername}", if a player asks you to tp or teleport to you you can use this), ("/tpaccept", you can use this command to accept a teleport request from another player) ingame chat history for  context(this is for context only): ${messageHistoryString}.`
                 },
                 { role: 'user', content: message }
             ],
@@ -118,11 +118,12 @@ bot.on('message', async (jsonMsg) => {
                         lastMentionedPlayers[playerName] = Date.now();
                         console.log(`Updated lastMentionedPlayers for ${playerName}`);
                     }
+                    //waits for 3 seconds before sending the response
                     setTimeout(() => {
                         bot.chat(responseText);
                         console.log(`Bot response: ${responseText}`);
                         trackSentMessage(responseText);
-                    }, 0);
+                    }, 0); //this is the delay before sending the response
                 } else {
                     console.error('Message content is undefined');
                 }
@@ -225,11 +226,14 @@ async function processMessage(message) {
     //you are playing your favourite server wildwood smp. you will talk like a pirate. dont say "ppmoment:" or "ppmoment" in your responses. keep your responses as short as possible
     const payload = {
         messages: [
-            { role: 'system', content: 'assistant, keep responses as short as possible'},
+            { 
+                role: 'system', 
+                content: `your name is ppmoment. keep responses as short as possible. youre playing on a Minecraft server you love called earthvision. you like to swear occasionally. do NOT use *, quotes, or emojis in your responses.  here are the commands you have access to: ("/tpa {playername}", if a player asks you to tp or teleport to you you can use this), ("/tpaccept", you can use this command to accept a teleport request from another player) ingame chat history for  context(this is for context only): ${messageHistoryString}.`
+            },
             { role: 'user', content: message }
         ],
         temperature: 0.7,
-        max_tokens: 40,
+        max_tokens: 500,
         stream: false
     };
 
