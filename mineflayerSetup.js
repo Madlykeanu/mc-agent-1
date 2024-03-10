@@ -8,7 +8,7 @@ const configPath = path.join(__dirname, 'config.json');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
 let bot = mineflayer.createBot({
-    host: 'join.wildwoodsmp.com', // Minecraft server IP (change this to your server's IP)
+    host: 'localhost', // Minecraft server IP (change this to your server's IP)
     port: 25565,       // server port, 25565 by default
     username: 'madlykeanu@gmail.com', // Your Mojang or Microsoft account email
     auth: 'microsoft', // Use 'mojang' for Mojang accounts, 'microsoft' for Microsoft accounts
@@ -20,8 +20,8 @@ let canRespondToMessages = false;
 let ignoreNextPpmomentMessage = true;
 let lastMentionedPlayers = {}; // New structure to track mentions
 let lastSentMessages = []; // Track the last 5 messages sent by the bot
-let respondToMentionsOnly = false; // Set to true to respond only to mentions of 'ppmoment' or 'pp'
-let respondToAllMessages = true; // Add this flag at the top with other flags
+let respondToMentionsOnly = true; // False enables response to players within 5s without mention
+let respondToAllMessages = false; // Add this flag at the top with other flags
 let lastMessageTime = 0; // Initialize with 0 to track the timestamp of the last message sent
 
 // Listen for the spawn event
@@ -32,6 +32,9 @@ bot.on('spawn', () => {
     ignoreNextPpmomentMessage = true; // Reset the flag on spawn
 });
 
+// Initialize the message history array at the top with other flags
+let messageHistory = [];
+
 bot.on('message', async (jsonMsg) => {
     if (!canRespondToMessages) return;
 
@@ -41,9 +44,28 @@ bot.on('message', async (jsonMsg) => {
     }
 
     const message = jsonMsg.toString();
+
+    // Get current timestamp
+    const timestamp = new Date().toISOString(); // ISO format: YYYY-MM-DDTHH:mm:ss.sssZ
+
+    // Combine timestamp and message
+    const timedMessage = `[${timestamp}] - ${message}`;
+    console.log(`added message to history ${timedMessage}`);
+
+    // Update message history with every message received
+    messageHistory.push(timedMessage);
+
+    // Limit the message history to the last 100 messages
+    if (messageHistory.length > 100) {
+        messageHistory.shift(); // Remove the oldest message
+    }
+
     const playerName = extractPlayerName(message);
 
     console.log(`Received message from ${playerName}: ${message}`);
+
+
+
 
     const shouldUpdateMentionedPlayers = message.includes('ppmoment') || message.includes('pp');
 
@@ -69,9 +91,15 @@ bot.on('message', async (jsonMsg) => {
     if (shouldUpdateMentionedPlayers || lastMentionedPlayers[playerName]) {
         console.log(`Preparing to respond to ${playerName}`);
 
+        // Construct the message history string
+        const messageHistoryString = messageHistory.join(' '); // Or use '\n' for new lines
+
         const payload = {
             messages: [
-                { role: 'system', content: 'your name is ppmoment. keep responses as short as possible. youurplaying on a Minecraft server you love called earthvision. you like to swear occasionally. do NOT use *, quotes, or emojis in your responses.'},
+                { 
+                    role: 'system', 
+                    content: `your name is ppmoment. keep responses as short as possible. you're playing on a Minecraft server you love called earthvision. you like to swear occasionally. do NOT use *, quotes, or emojis in your responses. here is the message history from the previous messages you and other players have sent you can use as context: ${messageHistoryString}`
+                },
                 { role: 'user', content: message }
             ],
             temperature: 0.7,
@@ -94,7 +122,7 @@ bot.on('message', async (jsonMsg) => {
                         bot.chat(responseText);
                         console.log(`Bot response: ${responseText}`);
                         trackSentMessage(responseText);
-                    }, 3000);
+                    }, 0);
                 } else {
                     console.error('Message content is undefined');
                 }
