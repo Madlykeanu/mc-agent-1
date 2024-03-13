@@ -7,7 +7,7 @@ const readline = require('readline');
 const configPath = path.join(__dirname, 'config.json');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8')); 
 let bot = mineflayer.createBot({
-    host: 'localhost', // Minecraft server IP (change this to your server's IP)
+    host: 'play.earthvision.eu', // Minecraft server IP (change this to your server's IP)
     port: 25565,       // server port, 25565 by default
     username: 'madlykeanu@gmail.com', // Your Mojang or Microsoft account email
     auth: 'microsoft', // Use 'mojang' for Mojang accounts, 'microsoft' for Microsoft accounts
@@ -19,7 +19,7 @@ let canRespondToMessages = false;
 let ignoreNextPpmomentMessage = true;
 let lastMentionedPlayers = {}; // New structure to track mentions
 let lastSentMessages = []; // Track the last 5 messages sent by the bot
-let respondToMentionsOnly = false; // False enables response to players within 5s without mention
+let respondToMentionsOnly = true; // False enables response to players within 5s without mention
 let respondToAllMessages = false; // Add this flag at the top with other flags
 let lastMessageTime = 0; // Initialize with 0 to track the timestamp of the last message sent
 
@@ -88,6 +88,27 @@ bot.on('message', async (jsonMsg) => {
         return;
     }
 
+    // Function to send a message, removing newlines
+    function sendMessageWithoutNewlines(message) {
+        // Replace newline characters with spaces
+        const singleLineMessage = message.replace(/\n/g, ' ');
+        bot.chat(singleLineMessage);
+    }
+
+    function sendResponseInParts(responseText, delay = 1000) {
+        const MAX_LENGTH = 256; // Adjust based on server's max message length
+        if (responseText.length <= MAX_LENGTH) {
+            bot.chat(responseText);
+        } else {
+            for (let i = 0; i < responseText.length; i += MAX_LENGTH) {
+                const part = responseText.substring(i, i + MAX_LENGTH);
+                setTimeout(() => {
+                    bot.chat(part);
+                }, delay * (i / MAX_LENGTH));
+            }
+        }
+    }
+
     if (shouldUpdateMentionedPlayers || lastMentionedPlayers[playerName]) {
         console.log(`Preparing to respond to ${playerName}`);
 
@@ -96,9 +117,9 @@ bot.on('message', async (jsonMsg) => {
 
         const payload = {
             messages: [
-                { 
-                    role: 'system', 
-                    content: `your name is ppmoment. keep responses as short as possible. youre playing on a Minecraft server you love called earthvision. you like to swear occasionally. do NOT use *, quotes, or emojis in your responses.  here are the commands you have access to: ("/tpa {playername}", if a player asks you to tp or teleport to you you can use this), ("/tpaccept", you can use this command to accept a teleport request from another player) ingame chat history for  context(this is for context only): ${messageHistoryString}.`
+                {
+                    role: 'system',
+                    content: `your name is ppmoment. keep responses as SHORT as possible. youre playing on a Minecraft server you love called earthvision. you like to swear occasionally. do NOT use *, quotes, or emojis in your responses. ingame chat history:(this is for context only): ${messageHistoryString}.`
                 },
                 { role: 'user', content: message }
             ],
@@ -120,7 +141,7 @@ bot.on('message', async (jsonMsg) => {
                     }
                     //waits for 3 seconds before sending the response
                     setTimeout(() => {
-                        bot.chat(responseText);
+                        sendMessageWithoutNewlines(responseText);
                         console.log(`Bot response: ${responseText}`);
                         trackSentMessage(responseText);
                     }, 0); //this is the delay before sending the response
