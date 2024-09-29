@@ -17,7 +17,7 @@ let ignoreNextPpmomentMessage = true;
 let lastMentionedPlayers = {}; // Track mentions
 let lastSentMessages = []; // Track the last 10 messages sent by the bot
 let respondToMentionsOnly = true; 
-let respondToAllMessages = false; // Enables response to all messages
+let respondToAllMessages = true; // Enables response to all messages
 let lastMessageTime = 0; // Timestamp of the last message sent
 
 // Initialize the message history array
@@ -166,6 +166,15 @@ async function processMessage(message) {
                 // Try to parse the response as JSON
                 const jsonResponse = JSON.parse(messageContent);
                 
+                // Log the AI's thought process
+                console.log(`AI Thought: ${jsonResponse.thought}`);
+
+                // Check if the AI decided to respond
+                if (!jsonResponse.shouldRespond) {
+                    console.log('AI decided not to respond to this message.');
+                    return;
+                }
+
                 if (jsonResponse.tool) {
                     // Handle tool usage
                     const toolResult = handleToolUsage(jsonResponse.tool, jsonResponse.args);

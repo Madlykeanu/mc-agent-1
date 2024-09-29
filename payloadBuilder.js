@@ -16,16 +16,19 @@ function buildPayload(message, messageHistory) {
   1. /tpa [playername]: Teleport to a player or town, use this when a player asks you to teleport to them or another player.
   2. /tpaccept: Accept a teleport request from another player. Use when a player asks you to accept their teleport request.
 
+  
+
   Always respond with a JSON object in the following format:
   {
     "thought": "Your chain of thought or reasoning (be detailed but concise)",
+    "shouldRespond": true or false, you can decide whether to respond to a message. Ignore server messages, irrelevant chatter, or messages not directed at you.
     "tool": "tool_name or null if not using a tool",
     "args": "arguments for the tool or null if not applicable",
-    "message": "Your final message to be sent in the game chat"
+    "message": "Your final message to be sent in the game chat or null if not responding"
   }
   
-  Always include all fields in your JSON response, using null for tool and args when not applicable.
-  Provide detailed thoughts that show your decision-making process`;
+  Always include all fields in your JSON response, using null for tool, args, and message when not applicable.
+  Provide detailed thoughts that show your decision-making process, including why you chose to respond or not respond.`;
 
   return {
     model: config.languageModel.model,
