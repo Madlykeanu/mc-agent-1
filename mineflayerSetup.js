@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const httpRequestHandler = require('./httpRequestHandler');
 const readline = require('readline');
-const { buildPayload } = require('./payloadBuilder');
+const { buildPayload, addNewTool } = require('./payloadBuilder');
 
 // Load configuration
 const configPath = path.join(__dirname, 'config.json');
@@ -113,19 +113,12 @@ function messageEndsMatchLastSent(message) {
 
 // Add this function to handle tool usage
 function handleToolUsage(tool, args) {
-    switch (tool) {
-        case '/tpa':
-            if (args) {
-                bot.chat(`/tpa ${args}`);
-                return null;
-            }
-            return "Error: Missing player name for /tpa command";
-        case '/tpaccept':
-            bot.chat('/tpaccept');
-            return null;
-        default:
-            return `Error: Unknown tool command ${tool}`;
+    if (tool.startsWith('/')) {
+        const command = args ? `${tool} ${args}` : tool;
+        bot.chat(command);
+        return null;
     }
+    return `Error: Unknown tool command ${tool}`;
 }
 
 async function processMessage(message) {
@@ -175,8 +168,14 @@ async function processMessage(message) {
                     return;
                 }
 
+                if (jsonResponse.newTool) {
+                    // Add the new tool
+                    const addToolResult = addNewTool(jsonResponse.newTool);
+                    console.log(addToolResult);
+                }
+
                 if (jsonResponse.tool) {
-                    // Handle tool usage without assigning the result to messageContent
+                    // Handle tool usage
                     const toolResult = handleToolUsage(jsonResponse.tool, jsonResponse.args);
                     if (toolResult && toolResult.startsWith("Error:")) {
                         console.error(toolResult);

@@ -3,8 +3,11 @@
  * This module is responsible for building the payload for the chat model requests.
  */
 
+const fs = require('fs');
+const path = require('path');
 const config = require('./config.json');
-const tools = require('./tools.json');
+
+let tools = require('./tools.json');
 
 /**
  * Builds the payload for the chat model request.
@@ -17,18 +20,20 @@ function buildPayload(message, messageHistory) {
     `${tool.name}: ${tool.description}. Usage: ${tool.usage}`
   ).join('\n');
 
-  const systemMessage = `You're an edgy player called ppmoment. You're playing on a Minecraft server you love called earthvision. Keep responses as short and concise as possible. Do NOT use *, quotes, or emojis in your responses.
+  const systemMessage = `You're an helpful player called ppmoment. You're playing on a Minecraft server you love called earthvision. Keep responses as short and concise as possible. Do NOT use *, quotes, or emojis in your responses.
 
   Always respond with a JSON object in the following format:
   {
     "thought": "Your chain of thought or reasoning (be detailed but concise)",
     "shouldRespond": true or false, you can decide whether to respond to a message. Ignore server messages, irrelevant chatter, or messages not directed at you.
+    "newTool": { "name": "tool_name", "description": "tool_description", "usage": "tool_usage", "args": ["arg1", "arg2"] } or null if no new tool is being added,
     "tool": "tool_name or null if not using a tool",
     "args": "arguments for the tool or null if not applicable",
     "message": "Your final message to be sent in the game chat or null if not responding"
   }
   
-  Always include all fields in your JSON response, using null for tool, args, and message when not applicable.
+  Always include all fields in your JSON response, using null for newTool, tool, args, and message when not applicable.
+  If a player tells you about a new command you can use, include it in the newTool field.
   Provide detailed thoughts that show your decision-making process, including why you chose to respond or not respond.`;
 
   return {
@@ -56,4 +61,25 @@ function buildPayload(message, messageHistory) {
   };
 }
 
-module.exports = { buildPayload };
+function addNewTool(newTool) {
+  if (!newTool || !newTool.name || !newTool.description || !newTool.usage) {
+    return "Error: Invalid tool format";
+  }
+
+  // Check if the tool already exists
+  const existingTool = tools.find(tool => tool.name === newTool.name);
+  if (existingTool) {
+    return `Tool ${newTool.name} already exists`;
+  }
+
+  // Add the new tool
+  tools.push(newTool);
+
+  // Save the updated tools to the JSON file
+  const toolsPath = path.join(__dirname, 'tools.json');
+  fs.writeFileSync(toolsPath, JSON.stringify(tools, null, 2));
+
+  return `New tool ${newTool.name} added successfully`;
+}
+
+module.exports = { buildPayload, addNewTool };
