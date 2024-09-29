@@ -20,7 +20,7 @@ function buildPayload(message, messageHistory) {
   {"tool": "tool_name", "args": "arguments", "message": "your message"}
   
   For example:
-  {"tool": "/tpa", "args": "madlykeanu", "message": "Sure, I'll teleport to you."}
+  {"tool": "/tpa", "args": "madlykeanu", "message": "ok."}
   
   If you're not using a tool, just respond with your message as normal.
   Always include a "message" in your JSON response, even if it's just "Done" after using a tool.`;
@@ -34,7 +34,7 @@ function buildPayload(message, messageHistory) {
       },
       {
         role: "system",
-        content: `Ingame chat history for context: ${messageHistory}`
+        content: `Ingame chat history for context: ${messageHistory} `
       },
       {
         role: "user",
