@@ -7,7 +7,15 @@ const fs = require('fs');
 const path = require('path');
 const config = require('./config.json');
 
-let tools = require('./tools.json');
+// Remove the global tools variable
+// let tools = require('./tools.json');
+
+// Add a function to load tools
+function loadTools() {
+  const toolsPath = path.join(__dirname, 'tools.json');
+  const toolsData = fs.readFileSync(toolsPath, 'utf8');
+  return JSON.parse(toolsData);
+}
 
 /**
  * Builds the payload for the chat model request.
@@ -16,6 +24,9 @@ let tools = require('./tools.json');
  * @returns {Object} The payload object for the chat model request.
  */
 function buildPayload(message, messageHistory) {
+  // Load tools before each prompt
+  const tools = loadTools();
+
   const toolsDescription = tools.map(tool => 
     `${tool.name}: ${tool.description}. Usage: ${tool.usage}`
   ).join('\n');
@@ -65,6 +76,9 @@ function addNewTool(newTool) {
   if (!newTool || !newTool.name || !newTool.description || !newTool.usage) {
     return "Error: Invalid tool format";
   }
+
+  // Load the current tools
+  const tools = loadTools();
 
   // Check if the tool already exists
   const existingTool = tools.find(tool => tool.name === newTool.name);
