@@ -4,7 +4,7 @@ const axios = require('axios');
  * Sends a POST request to the language model server and returns the response.
  * @param {string} url The URL of the language model server.
  * @param {Object} payload The payload to send in the POST request.
- * @returns {Promise<Object>} The response from the server as a JSON object.
+ * @returns {Promise<Object>} The response from the server as a JSON object..
  */
 async function sendPostRequest(url, payload) {
     try {
