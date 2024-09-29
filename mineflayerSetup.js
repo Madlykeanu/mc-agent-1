@@ -111,6 +111,23 @@ function messageEndsMatchLastSent(message) {
     return false;
 }
 
+// Add this function to handle tool usage
+function handleToolUsage(tool, args) {
+    switch (tool) {
+        case '/tpa':
+            if (args) {
+                bot.chat(`/tpa ${args}`);
+                return "Done";
+            }
+            return "Error: Missing player name for /tpa command";
+        case '/tpaccept':
+            bot.chat('/tpaccept');
+            return "Done";
+        default:
+            return `Error: Unknown tool command ${tool}`;
+    }
+}
+
 async function processMessage(message) {
     console.log(`Processing message: ${message}`);
 
@@ -143,15 +160,32 @@ async function processMessage(message) {
         const response = await httpRequestHandler.sendPostRequest(config.languageModel.url, payload);
 
         if (response.choices && response.choices.length > 0 && response.choices[0].message) {
-            const messageContent = response.choices[0].message.content;
+            let messageContent = response.choices[0].message.content.trim();
+            
+            try {
+                // Try to parse the response as JSON
+                const jsonResponse = JSON.parse(messageContent);
+                
+                if (jsonResponse.tool) {
+                    // Handle tool usage
+                    const toolResult = handleToolUsage(jsonResponse.tool, jsonResponse.args);
+                    messageContent = jsonResponse.message || toolResult;
+                } else {
+                    // If no tool is used, just use the message
+                    messageContent = jsonResponse.message;
+                }
+            } catch (error) {
+                // If parsing fails, assume it's a regular message
+                console.log('Response is not in JSON format, treating as regular message');
+            }
+
             if (messageContent) {
-                const responseText = messageContent.trim();
                 // Delay sending the response by 3 seconds
                 setTimeout(() => {
-                    bot.chat(responseText);
-                    console.log(`Bot response: ${responseText}`);
+                    bot.chat(messageContent);
+                    console.log(`Bot response: ${messageContent}`);
                     // Track the sent message to prevent responding to it again
-                    trackSentMessage(responseText);
+                    trackSentMessage(messageContent);
                 }, 3000);
             } else {
                 console.error('Message content is undefined');

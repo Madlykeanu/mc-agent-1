@@ -1,6 +1,6 @@
 {
   "bot": {
-    "host": "localhost",
+    "host": "play.earthvision.eu",
     "port": 25565,
     "username": "madlykeanu@gmail.com",
     "auth": "microsoft",
