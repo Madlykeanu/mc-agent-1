@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const httpRequestHandler = require('./httpRequestHandler');
 const readline = require('readline');
-const { buildPayload, addNewTool } = require('./payloadBuilder');
+const { buildPayload, addNewCommand } = require('./payloadBuilder');
 
 // Load configuration
 const configPath = path.join(__dirname, 'config.json');
@@ -34,10 +34,6 @@ bot.on('spawn', () => {
 // New variables for message batching
 let newMessages = [];
 let lastProcessedTime = 0;
-
-// Remove these variables as they're no longer needed
-// let lastMessageTime = 0;
-// let respondToAllMessages = true;
 
 bot.on('message', async (jsonMsg) => {
     if (!canRespondToMessages) return;
@@ -87,21 +83,35 @@ async function processBatchedMessages() {
 
         if (response.choices && response.choices[0].message) {
             let messageContent = response.choices[0].message.content.trim();
-            
+
+            // Strip Markdown code block markers if present
+            const strippedContent = stripMarkdownCodeBlocks(messageContent);
+            console.log(`Original AI response: ${messageContent}`);
+            console.log(`Stripped AI response: ${strippedContent}`);
+
             try {
-                const jsonResponse = JSON.parse(messageContent);
+                const jsonResponse = JSON.parse(strippedContent);
                 console.log(`AI Thought: ${jsonResponse.thought}`);
 
-                if (jsonResponse.shouldRespond) {
-                    if (jsonResponse.newTool) {
-                        const addToolResult = addNewTool(jsonResponse.newTool);
-                        console.log(addToolResult);
+                // **Process newCommand regardless of shouldRespond**
+                if (jsonResponse.newCommand) {
+                    try {
+                        console.log(`Attempting to add/update command: ${JSON.stringify(jsonResponse.newCommand)}`);
+                        const addCommandResult = addNewCommand(jsonResponse.newCommand);
+                        console.log(`Result of adding/updating command: ${addCommandResult}`);
+                        // Provide feedback to the AI about the command update
+                        messageHistory.push(`System: ${addCommandResult}`);
+                    } catch (error) {
+                        console.error('Error adding/updating command:', error);
+                        messageHistory.push(`System: Error adding/updating command: ${error.message}`);
                     }
+                }
 
-                    if (jsonResponse.tool) {
-                        const toolResult = handleToolUsage(jsonResponse.tool, jsonResponse.args);
-                        if (toolResult && toolResult.startsWith("Error:")) {
-                            console.error(toolResult);
+                if (jsonResponse.shouldRespond) {
+                    if (jsonResponse.command) {
+                        const commandResult = handleCommandUsage(jsonResponse.command, jsonResponse.args);
+                        if (commandResult && commandResult.startsWith("Error:")) {
+                            console.error(commandResult);
                         }
                     }
 
@@ -116,7 +126,8 @@ async function processBatchedMessages() {
                     console.log('AI decided not to respond to these messages.');
                 }
             } catch (error) {
-                console.log('Response is not in JSON format:', error);
+                console.error('Error processing AI response:', error);
+                console.log('Stripped content that failed to parse:', strippedContent);
             }
         } else {
             console.error('Invalid response structure:', response);
@@ -193,5 +204,35 @@ function handleToolUsage(tool, args) {
     return `Error: Unknown tool command ${tool}`;
 }
 
-// Remove or comment out the old processMessage function
-// async function processMessage(message) { ... }
+// Make sure this function is defined
+function handleCommandUsage(command, args) {
+    if (command.startsWith('/')) {
+        const fullCommand = args ? `${command} ${args}` : command;
+        bot.chat(fullCommand);
+        return null;
+    }
+    return `Error: Unknown command ${command}`;
+}
+
+/**
+ * Strips Markdown code block markers if present.
+ * @param {string} text - The text to process.
+ * @returns {string} The text with code block markers removed if they were present.
+ */
+function stripMarkdownCodeBlocks(text) {
+    // Check if the text starts and ends with code block markers
+    if (text.startsWith('```') && text.endsWith('```')) {
+        // Remove the starting and ending code block markers
+        text = text.slice(3, -3);
+        
+        // Remove the language specifier if present (e.g., 'json')
+        const firstLineBreak = text.indexOf('\n');
+        if (firstLineBreak !== -1) {
+            const firstLine = text.slice(0, firstLineBreak).trim();
+            if (firstLine === 'json') {
+                text = text.slice(firstLineBreak + 1);
+            }
+        }
+    }
+    return text.trim();
+}

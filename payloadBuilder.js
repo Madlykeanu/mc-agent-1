@@ -7,14 +7,26 @@ const fs = require('fs');
 const path = require('path');
 const config = require('./config.json');
 
-// Remove the global tools variable
-// let tools = require('./tools.json');
+// Rename loadCommands to loadCommands
+function loadCommands() {
+  const commandsPath = path.join(__dirname, 'commands.json');
+  try {
+    const data = fs.readFileSync(commandsPath, 'utf8');
+    console.log(`[loadCommands] Successfully loaded commands from ${commandsPath}`);
+    return JSON.parse(data);
+  } catch (error) {
+    console.error(`[loadCommands] Error loading commands: ${error.message}`);
+    return [];
+  }
+}
 
-// Add a function to load tools
-function loadTools() {
-  const toolsPath = path.join(__dirname, 'tools.json');
-  const toolsData = fs.readFileSync(toolsPath, 'utf8');
-  return JSON.parse(toolsData);
+/**
+ * Normalizes command names by removing the leading slash.
+ * @param {string} name - The command name to normalize.
+ * @returns {string} The normalized command name.
+ */
+function normalizeCommandName(name) {
+  return name.startsWith('/') ? name.slice(1) : name;
 }
 
 /**
@@ -24,44 +36,47 @@ function loadTools() {
  * @returns {Object} The payload object for the chat model request.
  */
 function buildPayload(message, messageHistory) {
-  // Load tools before each prompt
-  const tools = loadTools();
+  // Load commands before each prompt
+  const commands = loadCommands();
 
-  const toolsDescription = tools.map(tool => 
-    `${tool.name}: ${tool.description}. Usage: ${tool.usage}`
+  const commandsDescription = commands.map(command => 
+    `${command.name}: ${command.description}. Usage: ${command.usage}`
   ).join('\n');
 
-  const systemMessage = `You're an helpful player called ppmoment. You're playing on a Minecraft server you love called earthvision. Keep responses as short and concise as possible. Do NOT use *, quotes, or emojis in your responses.
+  const systemMessage = `You're a helpful player called ppmoment. You're playing on a Minecraft server you love called earthvision. Keep responses as short and concise as possible. Do NOT use *, quotes, or emojis in your responses.
 
-  Always respond with a JSON object in the following format:
-  {
-    "thought": "Your chain of thought or reasoning (be detailed but concise)",
-    "shouldRespond": true or false, you can decide whether to respond to a message. Ignore server messages, irrelevant chatter, or messages not directed at you.
-    "newTool": { "name": "tool_name", "description": "tool_description", "usage": "tool_usage", "args": ["arg1", "arg2"] } or null if no new tool is being added,
-    "tool": "tool_name or null if not using a tool",
-    "args": "arguments for the tool or null if not applicable",
-    "message": "Your final message to be sent in the game chat or null if not responding"
-  }
-  
-  Always include all fields in your JSON response, using null for newTool, tool, args, and message when not applicable.
-  If a player tells you about a new command you can use, include it in the newTool field.
-  Provide detailed thoughts that show your decision-making process, including why you chose to respond or not respond.`;
+Always respond with a JSON object in the following format:
+{
+  "thought": "Your chain of thought or reasoning (be detailed but concise)",
+  "shouldRespond": true or false, you can decide whether to respond to a message. Ignore server messages, irrelevant chatter, or messages not directed at you.
+  "newCommand": { "name": "command_name", "description": "command_description", "usage": "command_usage", "args": ["arg1", "arg2"] } or null if no new command is being added or updated,
+  "command": "command_name or null if not using a command",
+  "args": "arguments for the command or null if not applicable",
+  "message": "Your final message to be sent in the game chat or null if not responding"
+}
+
+Always include all fields in your JSON response, using null for newCommand, command, args, and message when not applicable.
+
+Provide detailed thoughts that show your decision-making process, including why you chose to respond or not respond.
+
+Important: You can use the "newCommand" field to add new commands or update existing ones if you learn new information about how they work. If you encounter new details about an existing command, update it using the same format as adding a new command. This helps keep your knowledge of commands up-to-date.`;
 
   return {
     model: config.languageModel.model,
     messages: [
       {
         role: "system",
+        content: `Ingame chat history for context: ${messageHistory}`
+      },
+      {
+        role: "system",
         content: systemMessage
       },
       {
         role: "system",
-        content: `Available tools:\n${toolsDescription}`
+        content: `Available commands:\n${commandsDescription}`
       },
-      {
-        role: "system",
-        content: `Ingame chat history for context: ${messageHistory}`
-      },
+      
       {
         role: "user",
         content: message
@@ -72,28 +87,54 @@ function buildPayload(message, messageHistory) {
   };
 }
 
-function addNewTool(newTool) {
-  if (!newTool || !newTool.name || !newTool.description || !newTool.usage) {
-    return "Error: Invalid tool format";
+/**
+ * Adds a new command or updates an existing one in the commands.json file.
+ * @param {Object} newCommand - The new command object to add or update.
+ * @returns {string} Success or error message.
+ */
+function addNewCommand(newCommand) {
+  console.log(`[addNewCommand] Received newCommand: ${JSON.stringify(newCommand)}`);
+
+  if (!newCommand || !newCommand.name || !newCommand.description || !newCommand.usage) {
+    const errorMsg = "Error: Invalid command format";
+    console.error(`[addNewCommand] ${errorMsg}`);
+    return errorMsg;
   }
 
-  // Load the current tools
-  const tools = loadTools();
+  // Load the current commands
+  const commands = loadCommands();
+  console.log(`[addNewCommand] Current commands: ${JSON.stringify(commands, null, 2)}`);
 
-  // Check if the tool already exists
-  const existingTool = tools.find(tool => tool.name === newTool.name);
-  if (existingTool) {
-    return `Tool ${newTool.name} already exists`;
+  // Check if the command already exists
+  const existingCommandIndex = commands.findIndex(command => 
+    command.name === newCommand.name
+  );
+  let actionTaken;
+
+  if (existingCommandIndex !== -1) {
+    // Update the existing command
+    commands[existingCommandIndex] = newCommand;
+    actionTaken = "updated";
+    console.log(`[addNewCommand] Updated existing command at index ${existingCommandIndex}`);
+  } else {
+    // Add the new command
+    commands.push(newCommand);
+    actionTaken = "added";
+    console.log(`[addNewCommand] Added new command`);
   }
 
-  // Add the new tool
-  tools.push(newTool);
-
-  // Save the updated tools to the JSON file
-  const toolsPath = path.join(__dirname, 'tools.json');
-  fs.writeFileSync(toolsPath, JSON.stringify(tools, null, 2));
-
-  return `New tool ${newTool.name} added successfully`;
+  // Save the updated commands to the JSON file
+  const commandsPath = path.join(__dirname, 'commands.json');
+  try {
+    fs.writeFileSync(commandsPath, JSON.stringify(commands, null, 2));
+    const successMsg = `Command ${newCommand.name} ${actionTaken} successfully`;
+    console.log(`[addNewCommand] ${successMsg}`);
+    return successMsg;
+  } catch (error) {
+    const errorMsg = `Error: Failed to save ${actionTaken} command ${newCommand.name} to file`;
+    console.error(`[addNewCommand] ${errorMsg} - ${error.message}`);
+    return errorMsg;
+  }
 }
 
-module.exports = { buildPayload, addNewTool };
+module.exports = { buildPayload, addNewCommand };
