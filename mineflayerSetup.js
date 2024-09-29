@@ -31,33 +31,105 @@ bot.on('spawn', () => {
     ignoreNextPpmomentMessage = true; // Reset the flag on spawn
 });
 
+// New variables for message batching
+let newMessages = [];
+let lastProcessedTime = 0;
+
+// Remove these variables as they're no longer needed
+// let lastMessageTime = 0;
+// let respondToAllMessages = true;
+
 bot.on('message', async (jsonMsg) => {
     if (!canRespondToMessages) return;
 
     const message = jsonMsg.toString();
     const timestamp = new Date().toISOString();
     const timedMessage = `[${timestamp}] - ${message}`;
-    console.log(`Added message to history: ${timedMessage}`);
 
-    // **Update message history with every message received**
+    // Always add the message to chat history
+    console.log(`Added message to history: ${timedMessage}`);
     messageHistory.push(timedMessage);
     if (messageHistory.length > 50) {
         messageHistory.shift();
     }
 
-    if (respondToAllMessages) {
-        processMessage(message);
-        return; // Continue to ensure message history is updated
+    // Check if the message contains 'ppmoment' or 'ppmoment:' and skip adding to newMessages if it does
+    if (message.toLowerCase().includes('<ppmoment>') || message.includes('ppmoment:')) {
+        console.log('Skipping message to prevent responding to messages containing "<ppmoment>" or "ppmoment:".');
+        return;
     }
 
-    const playerName = extractPlayerName(message);
-    console.log(`Received message from ${playerName}: ${message}`);
-
-    // Check if the message mentions 'pp' or if respondToAllMessages is true
-    if (message.toLowerCase().includes('pp') || respondToAllMessages) {
-        await processMessage(message);
+    // Check if the incoming message's end matches the end of any of the last sent messages
+    if (messageEndsMatchLastSent(message)) {
+        console.log('Skipping message to prevent responding to own message.');
+        return;
     }
+
+    // Add new message to the batch for AI processing
+    newMessages.push(message);
 });
+
+// New function to process batched messages
+async function processBatchedMessages() {
+    if (newMessages.length === 0) return;
+
+    const currentTime = Date.now();
+    if (currentTime - lastProcessedTime < 5000) return;
+
+    console.log(`Processing ${newMessages.length} new messages`);
+
+    const batchedMessage = newMessages.join('\n');
+    newMessages = []; // Clear the batch
+
+    try {
+        const payload = buildPayload(batchedMessage, messageHistory.join('\n'));
+        const response = await httpRequestHandler.sendPostRequest(config.languageModel.url, payload);
+
+        if (response.choices && response.choices[0].message) {
+            let messageContent = response.choices[0].message.content.trim();
+            
+            try {
+                const jsonResponse = JSON.parse(messageContent);
+                console.log(`AI Thought: ${jsonResponse.thought}`);
+
+                if (jsonResponse.shouldRespond) {
+                    if (jsonResponse.newTool) {
+                        const addToolResult = addNewTool(jsonResponse.newTool);
+                        console.log(addToolResult);
+                    }
+
+                    if (jsonResponse.tool) {
+                        const toolResult = handleToolUsage(jsonResponse.tool, jsonResponse.args);
+                        if (toolResult && toolResult.startsWith("Error:")) {
+                            console.error(toolResult);
+                        }
+                    }
+
+                    if (jsonResponse.message) {
+                        setTimeout(() => {
+                            bot.chat(jsonResponse.message);
+                            console.log(`Bot response: ${jsonResponse.message}`);
+                            trackSentMessage(jsonResponse.message);
+                        }, 3000);
+                    }
+                } else {
+                    console.log('AI decided not to respond to these messages.');
+                }
+            } catch (error) {
+                console.log('Response is not in JSON format:', error);
+            }
+        } else {
+            console.error('Invalid response structure:', response);
+        }
+    } catch (error) {
+        console.error('Error handling batched messages:', error);
+    }
+
+    lastProcessedTime = currentTime;
+}
+
+// Set up interval to process batched messages every 5 seconds
+setInterval(processBatchedMessages, 5000);
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -121,93 +193,5 @@ function handleToolUsage(tool, args) {
     return `Error: Unknown tool command ${tool}`;
 }
 
-async function processMessage(message) {
-    console.log(`Processing message: ${message}`);
-
-    // Check if the message contains 'ppmoment' or 'ppmoment:' and skip processing if it does
-    if (message.toLowerCase().includes('<ppmoment>') || message.includes('ppmoment:')) {
-        console.log('Skipping response to prevent responding to messages containing "<ppmoment>" or "ppmoment:".');
-        return;
-    }
-
-    // Check if the incoming message's end matches the end of any of the last sent messages
-    if (messageEndsMatchLastSent(message)) {
-        console.log('Skipping response to prevent responding to own message.');
-        return;
-    }
-
-    // Check if 5 seconds have passed since the last message was initiated
-    const currentTime = Date.now();
-    if (currentTime - lastMessageTime < 5000) { // 5000 milliseconds = 5 seconds
-        console.log('Skipping response to maintain a minimum interval of 5 seconds between initiating messages.');
-        return;
-    }
-
-    // Update the last message time to now, marking the initiation of the POST request
-    lastMessageTime = Date.now();
-
-    // **Use the buildPayload function from payloadBuilder.js**
-    const payload = buildPayload(message, messageHistory.join('\n'));
-
-    try {
-        const response = await httpRequestHandler.sendPostRequest(config.languageModel.url, payload);
-
-        if (response.choices && response.choices.length > 0 && response.choices[0].message) {
-            let messageContent = response.choices[0].message.content.trim();
-            
-            try {
-                // Try to parse the response as JSON
-                const jsonResponse = JSON.parse(messageContent);
-                
-                // Log the AI's thought process
-                console.log(`AI Thought: ${jsonResponse.thought}`);
-
-                // Check if the AI decided to respond
-                if (!jsonResponse.shouldRespond) {
-                    console.log('AI decided not to respond to this message.');
-                    return;
-                }
-
-                if (jsonResponse.newTool) {
-                    // Add the new tool
-                    const addToolResult = addNewTool(jsonResponse.newTool);
-                    console.log(addToolResult);
-                }
-
-                if (jsonResponse.tool) {
-                    // Handle tool usage
-                    const toolResult = handleToolUsage(jsonResponse.tool, jsonResponse.args);
-                    if (toolResult && toolResult.startsWith("Error:")) {
-                        console.error(toolResult);
-                        return;
-                    }
-                    // Use the AI's message if provided, otherwise don't send anything
-                    messageContent = jsonResponse.message || null;
-                } else {
-                    // If no tool is used, just use the message
-                    messageContent = jsonResponse.message;
-                }
-            } catch (error) {
-                // If parsing fails, assume it's a regular message
-                console.log('Response is not in JSON format, treating as regular message');
-            }
-
-            if (messageContent) {
-                // Delay sending the response by 3 seconds
-                setTimeout(() => {
-                    bot.chat(messageContent);
-                    console.log(`Bot response: ${messageContent}`);
-                    // Track the sent message to prevent responding to it again
-                    trackSentMessage(messageContent);
-                }, 3000);
-            } else {
-                console.log('No message to send after tool usage or AI decided not to respond.');
-            }
-        } else {
-            console.error('Invalid response structure:', response);
-        }
-    } catch (error) {
-        console.error('Error handling chat message:', error);
-        bot.chat("Oops, I ran into an issue trying to respond.");
-    }
-}
+// Remove or comment out the old processMessage function
+// async function processMessage(message) { ... }
