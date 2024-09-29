@@ -117,12 +117,12 @@ function handleToolUsage(tool, args) {
         case '/tpa':
             if (args) {
                 bot.chat(`/tpa ${args}`);
-                return "Done";
+                return null;
             }
             return "Error: Missing player name for /tpa command";
         case '/tpaccept':
             bot.chat('/tpaccept');
-            return "Done";
+            return null;
         default:
             return `Error: Unknown tool command ${tool}`;
     }
@@ -176,9 +176,14 @@ async function processMessage(message) {
                 }
 
                 if (jsonResponse.tool) {
-                    // Handle tool usage
+                    // Handle tool usage without assigning the result to messageContent
                     const toolResult = handleToolUsage(jsonResponse.tool, jsonResponse.args);
-                    messageContent = jsonResponse.message || toolResult;
+                    if (toolResult && toolResult.startsWith("Error:")) {
+                        console.error(toolResult);
+                        return;
+                    }
+                    // Use the AI's message if provided, otherwise don't send anything
+                    messageContent = jsonResponse.message || null;
                 } else {
                     // If no tool is used, just use the message
                     messageContent = jsonResponse.message;
@@ -197,7 +202,7 @@ async function processMessage(message) {
                     trackSentMessage(messageContent);
                 }, 3000);
             } else {
-                console.error('Message content is undefined');
+                console.log('No message to send after tool usage or AI decided not to respond.');
             }
         } else {
             console.error('Invalid response structure:', response);
