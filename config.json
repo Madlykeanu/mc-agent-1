@@ -1,24 +1,15 @@
 {
   "bot": {
-    "username": "ChatBotAI",
-    "host": "play.earthvision.eu",
-    "port": 25565
+    "host": "localhost",
+    "port": 25565,
+    "username": "madlykeanu@gmail.com",
+    "auth": "microsoft",
+    "version": "1.20.4"
   },
   "languageModel": {
-    "url": "http://192.168.1.75:1000/v1/chat/completions",
-    "headers": {
-      "Content-Type": "application/json"
-    },
-    "defaultPayload": {
-      "model": "Deepseekcoder-7b",
-      "max_tokens": 1024,
-      "stream": true
-    }
-  },
-  "systemMessages": [
-    {
-      "role": "system",
-      "content": "Always answer in rhymes."
-    }
-  ]
+    "url": "https://api.openai.com/v1/chat/completions",
+    "model": "gpt-4o-mini",
+    "max_tokens": 500,
+    "temperature": 0.7
+  }
 }

@@ -8,13 +8,17 @@ const axios = require('axios');
  */
 async function sendPostRequest(url, payload) {
     try {
+        console.log('Sending POST request with payload:', JSON.stringify(payload, null, 2));
+        
         const response = await axios.post(url, payload, {
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
             },
         });
-        //console.log('Response data:', response.data); // Print the response data
-        return response.data; // axios wraps the response data in a 'data' property
+        
+        console.log('Response data:', JSON.stringify(response.data, null, 2));
+        return response.data;
     } catch (error) {
         // axios encapsulates errors in an 'error.response' object
         if (error.response) {

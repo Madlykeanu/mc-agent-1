@@ -3,25 +3,25 @@ const fs = require('fs');
 const path = require('path');
 const httpRequestHandler = require('./httpRequestHandler');
 const readline = require('readline');
+const { buildPayload } = require('./payloadBuilder');
+
 // Load configuration
 const configPath = path.join(__dirname, 'config.json');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8')); 
-let bot = mineflayer.createBot({
-    host: 'play.earthvision.eu', // Minecraft server IP (change this to your server's IP)
-    port: 25565,       // server port, 25565 by default
-    username: 'madlykeanu@gmail.com', // Your Mojang or Microsoft account email
-    auth: 'microsoft', // Use 'mojang' for Mojang accounts, 'microsoft' for Microsoft accounts
-    version: '1.20.2'
-});
 
-// Flag to determine if the bot should respond to messages
+let bot = mineflayer.createBot(config.bot);
+
+// Flags and tracking variables
 let canRespondToMessages = false;
 let ignoreNextPpmomentMessage = true;
-let lastMentionedPlayers = {}; // New structure to track mentions
-let lastSentMessages = []; // Track the last 5 messages sent by the bot
-let respondToMentionsOnly = true; // False enables response to players within 5s without mention
-let respondToAllMessages = false; // Add this flag at the top with other flags
-let lastMessageTime = 0; // Initialize with 0 to track the timestamp of the last message sent
+let lastMentionedPlayers = {}; // Track mentions
+let lastSentMessages = []; // Track the last 10 messages sent by the bot
+let respondToMentionsOnly = true; 
+let respondToAllMessages = false; // Enables response to all messages
+let lastMessageTime = 0; // Timestamp of the last message sent
+
+// Initialize the message history array
+let messageHistory = [];
 
 // Listen for the spawn event
 bot.on('spawn', () => {
@@ -31,138 +31,32 @@ bot.on('spawn', () => {
     ignoreNextPpmomentMessage = true; // Reset the flag on spawn
 });
 
-// Initialize the message history array at the top with other flags
-let messageHistory = [];
-
-
 bot.on('message', async (jsonMsg) => {
     if (!canRespondToMessages) return;
 
-    if (respondToAllMessages) {
-        processMessage(jsonMsg.toString());
-        return; // Return early to skip the rest of the logic
+    const message = jsonMsg.toString();
+    const timestamp = new Date().toISOString();
+    const timedMessage = `[${timestamp}] - ${message}`;
+    console.log(`Added message to history: ${timedMessage}`);
+
+    // **Update message history with every message received**
+    messageHistory.push(timedMessage);
+    if (messageHistory.length > 50) {
+        messageHistory.shift();
     }
 
-    const message = jsonMsg.toString();
-
-    // Get current timestamp
-    const timestamp = new Date().toISOString(); // ISO format: YYYY-MM-DDTHH:mm:ss.sssZ
-
-    // Combine timestamp and message
-    const timedMessage = `[${timestamp}] - ${message}`;
-    console.log(`added message to history ${timedMessage}`);
-
-    // Update message history with every message received
-    messageHistory.push(timedMessage);
-
-    // Limit the message history to the last 100 messages
-    if (messageHistory.length > 100) {
-        messageHistory.shift(); // Remove the oldest message
+    if (respondToAllMessages) {
+        processMessage(message);
+        return; // Continue to ensure message history is updated
     }
 
     const playerName = extractPlayerName(message);
-
     console.log(`Received message from ${playerName}: ${message}`);
 
-
-
-
-    const shouldUpdateMentionedPlayers = message.includes('ppmoment') || message.includes('pp');
-
-    if (message.includes('ppmoment:') || message.includes('<ppmoment>') || message.includes('/hub')) {
-        return;
+    // Check if the message mentions 'pp' or if respondToAllMessages is true
+    if (message.toLowerCase().includes('pp') || respondToAllMessages) {
+        await processMessage(message);
     }
-
-    if (ignoreNextPpmomentMessage) {
-        ignoreNextPpmomentMessage = false;
-        return;
-    }
-
-    if (lastSentMessages.includes(message)) {
-        console.log('Skipping response to prevent loop/spam.');
-        return;
-    }
-
-    if (respondToMentionsOnly && !message.includes('ppmoment') && !message.includes('pp')) {
-        console.log('Ignoring message as it does not mention ppmoment or pp.');
-        return;
-    }
-
-    // Function to send a message, removing newlines
-    function sendMessageWithoutNewlines(message) {
-        // Replace newline characters with spaces
-        const singleLineMessage = message.replace(/\n/g, ' ');
-        bot.chat(singleLineMessage);
-    }
-
-    function sendResponseInParts(responseText, delay = 1000) {
-        const MAX_LENGTH = 256; // Adjust based on server's max message length
-        if (responseText.length <= MAX_LENGTH) {
-            bot.chat(responseText);
-        } else {
-            for (let i = 0; i < responseText.length; i += MAX_LENGTH) {
-                const part = responseText.substring(i, i + MAX_LENGTH);
-                setTimeout(() => {
-                    bot.chat(part);
-                }, delay * (i / MAX_LENGTH));
-            }
-        }
-    }
-
-    if (shouldUpdateMentionedPlayers || lastMentionedPlayers[playerName]) {
-        console.log(`Preparing to respond to ${playerName}`);
-
-        // Construct the message history string
-        const messageHistoryString = messageHistory.join(' '); // Or use '\n' for new lines
-
-        const payload = {
-            messages: [
-                {
-                    role: 'system',
-                    content: `your name is ppmoment. keep responses as SHORT as possible. youre playing on a Minecraft server you love called earthvision. you like to swear occasionally. do NOT use *, quotes, or emojis in your responses. ingame chat history:(this is for context only): ${messageHistoryString}.`
-                },
-                { role: 'user', content: message }
-            ],
-            temperature: 0.7,
-            max_tokens: 500,
-            stream: false
-        };
-
-        try {
-            const response = await httpRequestHandler.sendPostRequest(config.languageModel.url, payload);
-
-            if (response.choices && response.choices.length > 0 && response.choices[0].message) {
-                const messageContent = response.choices[0].message.content;
-                if (messageContent) {
-                    const responseText = messageContent.trim();
-                    if (shouldUpdateMentionedPlayers) {
-                        lastMentionedPlayers[playerName] = Date.now();
-                        console.log(`Updated lastMentionedPlayers for ${playerName}`);
-                    }
-                    //waits for 3 seconds before sending the response
-                    setTimeout(() => {
-                        sendMessageWithoutNewlines(responseText);
-                        console.log(`Bot response: ${responseText}`);
-                        trackSentMessage(responseText);
-                    }, 0); //this is the delay before sending the response
-                } else {
-                    console.error('Message content is undefined');
-                }
-            } else {
-                console.error('Invalid response structure:', response);
-            }
-        } catch (error) {
-            console.error('Error handling chat message:', error);
-            bot.chat("Oops, I ran into an issue trying to respond.");
-        }
-    }
-
-    Object.keys(lastMentionedPlayers).forEach(player => {
-        if ((Date.now() - lastMentionedPlayers[player]) > 5000) { // 5 seconds have passed
-            delete lastMentionedPlayers[player];
-            console.log(`Removed ${player} from lastMentionedPlayers due to timeout`);
-        }
-    });
 });
 
 const rl = readline.createInterface({
@@ -198,12 +92,11 @@ function trackSentMessage(message) {
     }
 }
 
-
 function messageEndsMatchLastSent(message) {
     // Extract the last 4 characters of the incoming message
     const incomingMessageEnd = message.slice(-4);
 
-    // Check against the last 5 messages sent by the bot
+    // Check against the last 10 messages sent by the bot
     for (let i = 0; i < lastSentMessages.length; i++) {
         // Extract the last 4 characters of the current message being checked
         const lastMessageEnd = lastSentMessages[i].slice(-4);
@@ -218,14 +111,12 @@ function messageEndsMatchLastSent(message) {
     return false;
 }
 
-
-
 async function processMessage(message) {
     console.log(`Processing message: ${message}`);
 
     // Check if the message contains 'ppmoment' or 'ppmoment:' and skip processing if it does
-    if (message.toLowerCase().includes('ppmoment') || message.includes('ppmoment:')) {
-        console.log('Skipping response to prevent responding to messages containing "ppmoment" or "ppmoment:".');
+    if (message.toLowerCase().includes('<ppmoment>') || message.includes('ppmoment:')) {
+        console.log('Skipping response to prevent responding to messages containing "<ppmoment>" or "ppmoment:".');
         return;
     }
 
@@ -244,19 +135,9 @@ async function processMessage(message) {
 
     // Update the last message time to now, marking the initiation of the POST request
     lastMessageTime = Date.now();
-    //you are playing your favourite server wildwood smp. you will talk like a pirate. dont say "ppmoment:" or "ppmoment" in your responses. keep your responses as short as possible
-    const payload = {
-        messages: [
-            { 
-                role: 'system', 
-                content: `your name is ppmoment. keep responses as short as possible. youre playing on a Minecraft server you love called earthvision. you like to swear occasionally. do NOT use *, quotes, or emojis in your responses.  here are the commands you have access to: ("/tpa {playername}", if a player asks you to tp or teleport to you you can use this), ("/tpaccept", you can use this command to accept a teleport request from another player) ingame chat history for  context(this is for context only): ${messageHistoryString}.`
-            },
-            { role: 'user', content: message }
-        ],
-        temperature: 0.7,
-        max_tokens: 500,
-        stream: false
-    };
+
+    // **Use the buildPayload function from payloadBuilder.js**
+    const payload = buildPayload(message, messageHistory.join('\n'));
 
     try {
         const response = await httpRequestHandler.sendPostRequest(config.languageModel.url, payload);
