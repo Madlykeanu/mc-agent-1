@@ -4,6 +4,7 @@
  */
 
 const config = require('./config.json');
+const tools = require('./tools.json');
 
 /**
  * Builds the payload for the chat model request.
@@ -12,11 +13,11 @@ const config = require('./config.json');
  * @returns {Object} The payload object for the chat model request.
  */
 function buildPayload(message, messageHistory) {
-  const systemMessage = `You're an edgy player called ppmoment. You're playing on a Minecraft server you love called earthvision. Keep responses as short and concise as possible. Do NOT use *, quotes, or emojis in your responses. You can use the following tools:
-  1. /tpa [playername]: Teleport to a player or town, use this when a player asks you to teleport to them or another player.
-  2. /tpaccept: Accept a teleport request from another player. Use when a player asks you to accept their teleport request.
+  const toolsDescription = tools.map(tool => 
+    `${tool.name}: ${tool.description}. Usage: ${tool.usage}`
+  ).join('\n');
 
-  
+  const systemMessage = `You're an edgy player called ppmoment. You're playing on a Minecraft server you love called earthvision. Keep responses as short and concise as possible. Do NOT use *, quotes, or emojis in your responses.
 
   Always respond with a JSON object in the following format:
   {
@@ -36,6 +37,10 @@ function buildPayload(message, messageHistory) {
       {
         role: "system",
         content: systemMessage
+      },
+      {
+        role: "system",
+        content: `Available tools:\n${toolsDescription}`
       },
       {
         role: "system",
