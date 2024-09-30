@@ -31,7 +31,7 @@ let messageHistory = [];
 bot.on('spawn', () => {
     setTimeout(() => {
         canRespondToMessages = true;
-    }, 10000);
+    }, 5000);
     ignoreNextPpmomentMessage = true; // Reset the flag on spawn
 });
 
@@ -299,13 +299,18 @@ function handleToolUsage(tool, args) {
 }
 
 // Modify this function to handle both script commands and commands from commands.json
-function handleCommandUsage(command, args) {
+async function handleCommandUsage(command, args) {
     // Remove leading '/' if present
     const normalizedCommand = command.startsWith('/') ? command.slice(1) : command;
 
     // Check if the command exists in the loaded scripts
     if (bot.scriptCommands && typeof bot.scriptCommands[normalizedCommand] === 'object' && typeof bot.scriptCommands[normalizedCommand].execute === 'function') {
-        return bot.scriptCommands[normalizedCommand].execute(bot, args);  // Pass 'bot' as the first argument
+        try {
+            const result = await bot.scriptCommands[normalizedCommand].execute(bot, args);
+            return result;
+        } catch (error) {
+            return `Error: ${error.message}`;
+        }
     }
 
     // Check if the command exists in commands.json
