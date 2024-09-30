@@ -1,0 +1,56 @@
+[
+  {
+    "name": "/tpa",
+    "description": "Teleport to a player or town",
+    "usage": "/tpa [playername]",
+    "args": [
+      "playername"
+    ]
+  },
+  {
+    "name": "/tpaccept",
+    "description": "Accept a teleport request from another player",
+    "usage": "/tpaccept",
+    "args": []
+  },
+  {
+    "name": "/town spawn",
+    "description": "Teleport to your town's spawn point.",
+    "usage": "/town spawn",
+    "args": []
+  },
+  {
+    "name": "/town create",
+    "description": "Create a new town.",
+    "usage": "/town create [townname]",
+    "args": [
+      "townname"
+    ]
+  },
+  {
+    "name": "/t leave",
+    "description": "Leave your current town.",
+    "usage": "/t leave",
+    "args": []
+  },
+  {
+    "name": "/confirm",
+    "description": "Confirm town invites, deletions, leaving and some other things.",
+    "usage": "/confirm",
+    "args": []
+  },
+  {
+    "name": "/town",
+    "description": "Check your current town.",
+    "usage": "/town",
+    "args": []
+  },
+  {
+    "name": "/town kick",
+    "description": "Kick a player from your town. Only usable by the mayor or players with the required permission.",
+    "usage": "/town kick [playername]",
+    "args": [
+      "playername"
+    ]
+  }
+]
