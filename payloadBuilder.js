@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const config = require('./config.json');
 const { getPlayerStats } = require('./playerStats');
+const { getEnvironmentInfo } = require('./environmentInfo');
 
 /**
  * Loads commands from commands.json.
@@ -85,11 +86,13 @@ function buildPayload(message, messageHistory, bot) {
   ).join('\n');
 
   let playerStats = { health: null, food: null, position: {x: null, y: null, z: null}, yaw: null, pitch: null, inventory: [], equipped: { hand: null, armor: { helmet: null, chestplate: null, leggings: null, boots: null } } };
+  let environmentInfo = { visiblePlayers: [], visibleMobs: [], visibleBlocks: [] };
   
   if (bot) {
     playerStats = getPlayerStats(bot);
+    environmentInfo = getEnvironmentInfo(bot);
   } else {
-    console.warn('[buildPayload] Bot is undefined, using default player stats');
+    console.warn('[buildPayload] Bot is undefined, using default player stats and environment info');
   }
 
   // Safely format position with toFixed if not null
@@ -111,6 +114,13 @@ Boots: ${playerStats.equipped.armor.boots}
 
 Inventory:
 ${playerStats.inventory.map(item => `${item.name} x${item.count}`).join(', ')}
+`;
+
+  const environmentMessage = `
+Environment Information:
+Visible Players: ${environmentInfo.visiblePlayers.map(p => `${p.name} (${p.distance}m)`).join(', ')}
+Visible Mobs: ${environmentInfo.visibleMobs.map(m => `${m.name} (${m.distance}m)`).join(', ')}
+Visible Blocks: ${environmentInfo.visibleBlocks.slice(0, 10).map(b => `${b.name} at ${b.position}`).join(', ')}${environmentInfo.visibleBlocks.length > 10 ? '...' : ''}
 `;
 
   const systemMessage = `You're a helpful player called ppmoment. You're playing on a Minecraft server you love called earthvision. Keep responses as short and concise as possible. Do NOT use *, quotes, or emojis in your responses.
@@ -143,6 +153,10 @@ The bot can execute various commands, including those loaded from scripts. Refer
       {
         role: "system",
         content: statsMessage
+      },
+      {
+        role: "system",
+        content: environmentMessage
       },
       {
         role: "system",

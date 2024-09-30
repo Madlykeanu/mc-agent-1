@@ -5,7 +5,7 @@
 
 function getPlayerStats(bot) {
     if (!bot || !bot.entity) {
-        console.log("[getPlayerStats] Bot or bot.entity is undefined");
+        
         return {
             health: null,
             food: null,
@@ -19,14 +19,6 @@ function getPlayerStats(bot) {
             }
         };
     }
-
-    console.log("[getPlayerStats] Bot health:", bot.health);
-    console.log("[getPlayerStats] Bot food:", bot.food);
-    console.log("[getPlayerStats] Bot position:", bot.entity.position);
-    console.log("[getPlayerStats] Bot yaw:", bot.entity.yaw);
-    console.log("[getPlayerStats] Bot pitch:", bot.entity.pitch);
-    console.log("[getPlayerStats] Bot inventory:", bot.inventory);
-    console.log("[getPlayerStats] Bot held item:", bot.heldItem);
 
     const inventory = bot.inventory?.slots
         ?.map((item, index) => {
