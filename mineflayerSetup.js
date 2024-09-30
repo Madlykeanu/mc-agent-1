@@ -142,8 +142,8 @@ async function processBatchedMessages() {
                         // Collect existing scripts as examples
                         const existingScripts = ['scripts/dropItem.js', 'scripts/followPlayer.js'];
 
-                        // Build script payload
-                        const scriptPayload = buildScriptPayload(description, commandName, existingScripts);
+                        // Pass the bot object here
+                        const scriptPayload = buildScriptPayload(description, commandName, existingScripts, bot);
 
                         // Send script generation request to AI
                         const scriptResponse = await httpRequestHandler.sendPostRequest(config.languageModel.url, scriptPayload);

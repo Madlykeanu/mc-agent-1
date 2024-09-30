@@ -253,7 +253,7 @@ function addNewCommand(newCommand) {
  * @param {Array} existingScripts - Array of existing script file paths.
  * @returns {Object} The payload object for the script generation request.
  */
-function buildScriptPayload(scriptDescription, commandName, existingScripts) {
+function buildScriptPayload(scriptDescription, commandName, existingScripts, bot) {
   // Read existing scripts' content
   const scriptContents = existingScripts.map(scriptPath => {
     const content = fs.readFileSync(path.join(__dirname, scriptPath), 'utf8');
@@ -263,6 +263,36 @@ ${content}
 \`\`\``;
   }).join('\n\n');
 
+  // Get player stats and environment info
+  const playerStats = getPlayerStats(bot);
+  const environmentInfo = getEnvironmentInfo(bot);
+
+  // Format player stats and environment info
+  const statsMessage = `
+Bot's current stats:
+Health: ${playerStats.health}
+Food: ${playerStats.food}
+Position: x=${playerStats.position.x.toFixed(2)}, y=${playerStats.position.y.toFixed(2)}, z=${playerStats.position.z.toFixed(2)}
+Yaw: ${playerStats.yaw.toFixed(2)}, Pitch: ${playerStats.pitch.toFixed(2)}
+
+Equipped items:
+Hand: ${playerStats.equipped.hand}
+Helmet: ${playerStats.equipped.armor.helmet}
+Chestplate: ${playerStats.equipped.armor.chestplate}
+Leggings: ${playerStats.equipped.armor.leggings}
+Boots: ${playerStats.equipped.armor.boots}
+
+Inventory:
+${playerStats.inventory.map(item => `${item.name} x${item.count}`).join(', ')}
+`;
+
+  const environmentMessage = `
+Environment Information:
+Visible Players: ${environmentInfo.visiblePlayers.map(p => `${p.name} (${p.distance}m)`).join(', ')}
+Visible Mobs: ${environmentInfo.visibleMobs.map(m => `${m.name} (${m.distance}m)`).join(', ')}
+Visible Blocks: ${environmentInfo.visibleBlocks.slice(0, 10).map(b => `${b.name} at ${b.position}`).join(', ')}${environmentInfo.visibleBlocks.length > 10 ? '...' : ''}
+`;
+
   const systemMessage = `You are an intelligent programmer specialized in creating Mineflayer scripts for Minecraft bots.
 
 ### Task:
@@ -270,9 +300,14 @@ You need to create a new script based on the following description. The script s
 
 Important: The main command in the script MUST be named "${commandName}".
 
-
 ### Script Description:
 ${scriptDescription}
+
+### Current Bot State:
+${statsMessage}
+
+### Current Environment:
+${environmentMessage}
 
 ### Existing Scripts:
 ${scriptContents}
@@ -282,6 +317,8 @@ ${scriptContents}
 - Do **not** include any explanations, comments, or additional text.
 - Ensure the script follows the same structure and coding style as the existing scripts.
 - The script should export necessary functions and commands to be compatible with the bot's script management system.
+- Use the provided bot state and environment information to inform your script creation.
+- Include necessary functions for head rotation, block placement, and other relevant actions based on the current bot capabilities.
 
 ### New Script:
 \`\`\`javascript
