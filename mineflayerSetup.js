@@ -82,7 +82,8 @@ async function processBatchedMessages() {
     newMessages = []; // Clear the batch
 
     try {
-        const payload = buildPayload(batchedMessage, messageHistory.join('\n'));
+        // Pass the bot object to buildPayload
+        const payload = buildPayload(batchedMessage, messageHistory.join('\n'), bot);
         const response = await httpRequestHandler.sendPostRequest(config.languageModel.url, payload);
 
         if (response.choices && response.choices[0].message) {

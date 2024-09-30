@@ -6,6 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const config = require('./config.json');
+const { getPlayerStats } = require('./playerStats');
 
 /**
  * Loads commands from commands.json.
@@ -69,9 +70,12 @@ function normalizeCommandName(name) {
  * Builds the payload for the chat model request.
  * @param {string} message - The message from the game chat to be sent to the model.
  * @param {string} messageHistory - The history of messages for context.
+ * @param {Object} bot - The bot object containing inventory and stats.
  * @returns {Object} The payload object for the chat model request.
  */
-function buildPayload(message, messageHistory) {
+function buildPayload(message, messageHistory, bot) {
+  console.log(`[buildPayload] Bot object:`, bot ? 'defined' : 'undefined');
+
   const commands = loadCommands();
   const scriptCommands = loadScriptCommands();
   const allCommands = [...commands, ...scriptCommands];
@@ -79,6 +83,35 @@ function buildPayload(message, messageHistory) {
   const commandsDescription = allCommands.map(command => 
     `${command.name}: ${command.description}. Usage: ${command.usage}`
   ).join('\n');
+
+  let playerStats = { health: null, food: null, position: {x: null, y: null, z: null}, yaw: null, pitch: null, inventory: [], equipped: { hand: null, armor: { helmet: null, chestplate: null, leggings: null, boots: null } } };
+  
+  if (bot) {
+    playerStats = getPlayerStats(bot);
+  } else {
+    console.warn('[buildPayload] Bot is undefined, using default player stats');
+  }
+
+  // Safely format position with toFixed if not null
+  const formatCoordinate = (coord) => (typeof coord === 'number' ? coord.toFixed(2) : 'N/A');
+
+  const statsMessage = `
+Bot's current stats:
+Health: ${playerStats.health !== null ? playerStats.health : 'N/A'}
+Food: ${playerStats.food !== null ? playerStats.food : 'N/A'}
+Position: x=${formatCoordinate(playerStats.position.x)}, y=${formatCoordinate(playerStats.position.y)}, z=${formatCoordinate(playerStats.position.z)}
+Yaw: ${playerStats.yaw !== null ? playerStats.yaw.toFixed(2) : 'N/A'}, Pitch: ${playerStats.pitch !== null ? playerStats.pitch.toFixed(2) : 'N/A'}
+
+Equipped items:
+Hand: ${playerStats.equipped.hand}
+Helmet: ${playerStats.equipped.armor.helmet}
+Chestplate: ${playerStats.equipped.armor.chestplate}
+Leggings: ${playerStats.equipped.armor.leggings}
+Boots: ${playerStats.equipped.armor.boots}
+
+Inventory:
+${playerStats.inventory.map(item => `${item.name} x${item.count}`).join(', ')}
+`;
 
   const systemMessage = `You're a helpful player called ppmoment. You're playing on a Minecraft server you love called earthvision. Keep responses as short and concise as possible. Do NOT use *, quotes, or emojis in your responses.
 
@@ -106,6 +139,10 @@ The bot can execute various commands, including those loaded from scripts. Refer
       {
         role: "system",
         content: `Ingame chat history for context: ${messageHistory}`
+      },
+      {
+        role: "system",
+        content: statsMessage
       },
       {
         role: "system",
