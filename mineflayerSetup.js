@@ -3,12 +3,16 @@ const fs = require('fs');
 const path = require('path');
 const httpRequestHandler = require('./httpRequestHandler');
 const readline = require('readline');
+const esprima = require('esprima'); // Ensure esprima is installed
 const { buildPayload, addNewCommand, buildScriptPayload } = require('./payloadBuilder');
-const { pathfinder } = require('mineflayer-pathfinder');
+const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 
 // Load configuration
 const configPath = path.join(__dirname, 'config.json');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8')); 
+
+// Define scriptsPath
+const scriptsPath = path.join(__dirname, 'scripts');
 
 let bot = mineflayer.createBot(config.bot);
 
@@ -27,13 +31,17 @@ let lastMessageTime = 0; // Timestamp of the last message sent
 // Initialize the message history array
 let messageHistory = [];
 
+// Temporary scripts storage for AI-generated scripts
+const tempScripts = {};
+
 // Listen for the spawn event
 bot.on('spawn', () => {
     setTimeout(() => {
         canRespondToMessages = true;
-    }, 5000);
+    }, 2000);
     ignoreNextPpmomentMessage = true; // Reset the flag on spawn
 });
+
 
 // New variables for message batching
 let newMessages = [];
@@ -69,254 +77,219 @@ bot.on('message', async (jsonMsg) => {
     newMessages.push(message);
 });
 
-// Function to create a new script from description
-async function createAndLoadScript(scriptCode, commandName) {
-    const scriptsDir = path.join(__dirname, 'scripts');
-    const scriptName = `${commandName}.js`;
-    const scriptPath = path.join(scriptsDir, scriptName);
-
-    try {
-        // Remove code block markers and language identifier
-        let cleanedScriptCode = scriptCode.replace(/^```javascript\s*/, '').replace(/```\s*$/, '');
-        
-        // Further clean up any remaining markdown artifacts
-        cleanedScriptCode = cleanedScriptCode.replace(/^```\s*/, '').trim();
-
-        fs.writeFileSync(scriptPath, cleanedScriptCode);
-        console.log(`New script '${scriptName}' created successfully.`);
-
-        // Dynamically load the new script
-        delete require.cache[require.resolve(scriptPath)]; // Clear the module cache
-        const newScript = require(scriptPath);
-        if (typeof newScript.init === 'function') {
-            newScript.init(bot);
-            console.log(`Initialized script: ${scriptName}`);
-        }
-
-        if (newScript.commands) {
-            Object.assign(bot.scriptCommands, newScript.commands);
-            console.log(`Registered commands from script: ${scriptName}`);
-        }
-
-        return `Script '${scriptName}' created and loaded successfully.`;
-    } catch (error) {
-        console.error(`Failed to create script '${scriptName}':`, error);
-        return `Error: Failed to create script '${scriptName}'. ${error.message}`;
-    }
-}
-
-// Update the processBatchedMessages function to handle createScript
+// Function to process batched messages every 5 seconds
 async function processBatchedMessages() {
     if (newMessages.length === 0) return;
 
-    const currentTime = Date.now();
-    if (currentTime - lastProcessedTime < 5000) return;
+    const batch = newMessages.join('\n');
+    newMessages = [];
 
-    console.log(`Processing ${newMessages.length} new messages`);
+    console.log('Starting to process batched messages...');
 
-    const batchedMessage = newMessages.join('\n');
-    newMessages = []; // Clear the batch
+    // Build the payload for AI request
+    console.log('Building payload...');
+    const payload = buildPayload(batch, messageHistory.join('\n'), bot);
+    console.log('Payload built successfully.');
 
     try {
-        // Pass the bot object to buildPayload
-        const payload = buildPayload(batchedMessage, messageHistory.join('\n'), bot);
-        const response = await httpRequestHandler.sendPostRequest(config.languageModel.url, payload);
-
+        console.log('Sending request to AI model...');
+        const startTime = Date.now();
+        const response = await httpRequestHandler.sendPostRequest(config.languageModel.url, payload, 60000); // 60 second timeout
+        const endTime = Date.now();
+        console.log(`Received response from AI model after ${endTime - startTime}ms`);
+        
         if (response.choices && response.choices[0].message) {
-            let messageContent = response.choices[0].message.content.trim();
+            console.log('Processing AI response...');
+            const jsonResponse = parseJSONResponse(response.choices[0].message.content);
 
-            // Strip Markdown code block markers if present
-            const strippedContent = stripMarkdownCodeBlocks(messageContent);
-            //console.log(`Original AI response: ${messageContent}`);
-            console.log(`Stripped AI response: ${strippedContent}`);
+            if (!jsonResponse) {
+                console.error('Invalid JSON response from AI.');
+                messageHistory.push(`System: Error parsing AI response.`);
+                return;
+            }
 
-            try {
-                const jsonResponse = JSON.parse(strippedContent);
-                
+            console.log('JSON response parsed successfully.');
+            console.log('AI response:', JSON.stringify(jsonResponse, null, 2));
 
-                // Handle createScript
-                if (jsonResponse.createScript && jsonResponse.createScript.create) {
-                    const { description, commandName, args } = jsonResponse.createScript;
+            // Handle command execution
+            if (jsonResponse.command) {
+                console.log(`Executing command: ${jsonResponse.command}`);
+                try {
+                    const result = await handleCommandUsage(jsonResponse.command, jsonResponse.args);
+                    console.log(`Command execution result: ${result}`);
+                    messageHistory.push(`System: Executed command ${jsonResponse.command}`);
+                } catch (error) {
+                    console.error(`Error executing command: ${error.message}`);
+                    messageHistory.push(`System: Error executing command - ${error.message}`);
+                }
+            }
 
-                    if (description && commandName) {
-                        // Collect existing scripts as examples
-                        const existingScripts = ['scripts/dropItem.js', 'scripts/followPlayer.js'];
+            // Handle createScript
+            if (jsonResponse.createScript && jsonResponse.createScript.create) {
+                const { description } = jsonResponse.createScript;
 
-                        // Pass the bot object here
-                        const scriptPayload = buildScriptPayload(description, commandName, existingScripts, bot);
+                if (description) {
+                    // Removed existingScripts as it's no longer needed
+                    // const existingScripts = ['scripts/dropItem.js', 'scripts/followPlayer.js']; // Remove or comment out this line
 
-                        // Send script generation request to AI
-                        const scriptResponse = await httpRequestHandler.sendPostRequest(config.languageModel.url, scriptPayload);
+                    // Build the script payload without existingScripts
+                    const scriptPayload = buildScriptPayload(description, bot); // Updated line
 
-                        if (scriptResponse.choices && scriptResponse.choices[0].message) {
-                            const scriptContent = scriptResponse.choices[0].message.content.trim();
+                    // Send script generation request to AI
+                    const scriptResponse = await httpRequestHandler.sendPostRequest(config.languageModel.url, scriptPayload);
 
-                            // Execute the newly generated script
-                            const scriptResult = await createAndLoadScript(scriptContent, commandName);
-                            messageHistory.push(`System: ${scriptResult}`);
-                            
-                            // Inform the AI about the new script
-                            messageHistory.push(`System: New script '${commandName}' has been created and loaded.`);
-                        } else {
-                            console.error('Invalid script generation response:', scriptResponse);
-                            messageHistory.push(`System: Error generating script.`);
-                        }
+                    if (scriptResponse.choices && scriptResponse.choices[0].message) {
+                        const scriptContent = stripMarkdownCodeBlocks(scriptResponse.choices[0].message.content.trim());
+
+                        // Execute the newly generated temporary script
+                        const scriptResult = await createAndLoadScript(scriptContent);
+                        messageHistory.push(`System: ${scriptResult}`);
+
+                        // Inform the AI about the new temporary script
+                        messageHistory.push(`System: Temporary script has been executed.`);
                     } else {
-                        console.error('createScript.create is true but missing description or commandName.');
-                        messageHistory.push(`System: Error creating script - Missing description or command name.`);
-                    }
-
-                    // **NEW CODE ADDED HERE**
-                    // Execute the newly created command with the provided arguments
-                    if (args && Array.isArray(args) && args.length > 0) {
-                        // Convert args array to a space-separated string
-                        const argsString = args.join(' ');
-                        console.log(`Executing newly created command '${commandName}' with arguments: ${argsString}`);
-
-                        // Execute the command
-                        const commandResult = await handleCommandUsage(commandName, argsString);
-
-                        if (commandResult && commandResult.startsWith("Error:")) {
-                            console.error(`Error executing command '${commandName}': ${commandResult}`);
-                            messageHistory.push(`System: ${commandResult}`);
-                        } else {
-                            console.log(`Command '${commandName}' executed successfully with arguments: ${argsString}`);
-                            messageHistory.push(`System: Command '${commandName}' executed successfully.`);
-                        }
-                    }
-                    // **END OF NEW CODE**
-                }
-
-                // Handle newCommand
-                if (jsonResponse.newCommand) {
-                    try {
-                        console.log(`Attempting to add/update command: ${JSON.stringify(jsonResponse.newCommand)}`);
-                        const addCommandResult = addNewCommand(jsonResponse.newCommand);
-                        console.log(`Result of adding/updating command: ${addCommandResult}`);
-                        // Provide feedback to the AI about the command update
-                        messageHistory.push(`System: ${addCommandResult}`);
-                    } catch (error) {
-                        console.error('Error adding/updating command:', error);
-                        messageHistory.push(`System: Error adding/updating command: ${error.message}`);
-                    }
-                }
-
-                if (jsonResponse.shouldRespond) {
-                    if (jsonResponse.command) {
-                        try {
-                            const commandResult = await handleCommandUsage(jsonResponse.command, jsonResponse.args);
-                            if (commandResult) {
-                                if (typeof commandResult === 'string' && commandResult.startsWith("Error:")) {
-                                    console.error(commandResult);
-                                } else {
-                                    console.log("Command executed successfully:", commandResult);
-                                }
-                            }
-                        } catch (error) {
-                            console.error(`Error executing command: ${error.message}`);
-                        }
-                    }
-
-                    if (jsonResponse.message) {
-                        setTimeout(() => {
-                            bot.chat(jsonResponse.message);
-                            console.log(`Bot response: ${jsonResponse.message}`);
-                            trackSentMessage(jsonResponse.message);
-                        }, 3000);
+                        console.error('Invalid script generation response:', scriptResponse);
+                        messageHistory.push(`System: Error generating script.`);
                     }
                 } else {
-                    console.log('AI decided not to respond to these messages.');
+                    console.error('createScript.create is true but missing description.');
+                    messageHistory.push(`System: Error creating script - Missing description.`);
                 }
-            } catch (error) {
-                console.error('Error processing AI response:', error);
-                console.log('Stripped content that failed to parse:', strippedContent);
+            }
+
+            // Handle newCommand
+            if (jsonResponse.newCommand) {
+                try {
+                    console.log(`Attempting to add/update command: ${JSON.stringify(jsonResponse.newCommand)}`);
+                    const addCommandResult = addNewCommand(jsonResponse.newCommand);
+                    console.log(`Result of adding/updating command: ${addCommandResult}`);
+                    // Provide feedback to the AI about the command update
+                    messageHistory.push(`System: ${addCommandResult}`);
+                } catch (error) {
+                    console.error('Error adding/updating command:', error);
+                    messageHistory.push(`System: Error adding/updating command: ${error.message}`);
+                }
+            }
+
+            // Handle shouldRespond and message
+            if (jsonResponse.shouldRespond && jsonResponse.message) {
+                console.log(`Sending message: ${jsonResponse.message}`);
+                bot.chat(jsonResponse.message);
+                trackSentMessage(jsonResponse.message);
+                messageHistory.push(`System: Sent message - ${jsonResponse.message}`);
             }
         } else {
-            console.error('Invalid response structure:', response);
+            console.error('Invalid AI response structure:', response);
+            messageHistory.push(`System: Error processing AI response.`);
         }
     } catch (error) {
-        console.error('Error handling batched messages:', error);
+        console.error('Error processing batched messages:', error);
+        if (error.code === 'ECONNABORTED') {
+            console.error('Request timed out. The AI model is taking too long to respond.');
+        }
+        messageHistory.push(`System: Error processing messages - ${error.message}`);
     }
 
-    lastProcessedTime = currentTime;
+    console.log('Finished processing batched messages.');
 }
 
 // Set up interval to process batched messages every 5 seconds
 setInterval(processBatchedMessages, 5000);
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-});
+// Function to create and execute a temporary script
+async function createAndLoadScript(scriptCode) {
+    console.log("Received script code:");
+    console.log(scriptCode);
+    console.log("End of received script code");
 
-rl.on('line', (line) => {
-  bot.chat(line);
-  trackSentMessage(line);
-});
+    try {
+        // Validate JavaScript syntax
+        esprima.parseScript(scriptCode);
 
-console.log('Mineflayer bot setup complete. Type in the terminal to send messages in-game.');
-
-function extractPlayerName(message) {
-    let match = message.match(/^<([^>]+)>/);
-    if (match) {
-        return match[1];
-    }
-
-    match = message.match(/\[.*\]\s*([^»]+)\s*»/);
-    if (match) {
-        return match[1].trim();
-    }
-
-    return null;
-}
-
-function trackSentMessage(message) {
-    lastSentMessages.unshift(message);
-    if (lastSentMessages.length > 10) {
-        lastSentMessages.pop();
+        // Execute the script in memory without saving to the scripts folder
+        const scriptFunction = new Function('bot', scriptCode);
+        scriptFunction(bot);
+        console.log(`Temporary script executed successfully.`);
+        return `Temporary script executed successfully.`;
+    } catch (error) {
+        console.error(`Failed to execute temporary script:`, error);
+        console.error(`Error details:`, error.stack);
+        return `Error: Failed to execute temporary script. ${error.message}`;
     }
 }
 
-function messageEndsMatchLastSent(message) {
-    // Extract the last 4 characters of the incoming message
-    const incomingMessageEnd = message.slice(-4);
-
-    // Check against the last 10 messages sent by the bot
-    for (let i = 0; i < lastSentMessages.length; i++) {
-        // Extract the last 4 characters of the current message being checked
-        const lastMessageEnd = lastSentMessages[i].slice(-4);
-
-        // Compare the two
-        if (incomingMessageEnd === lastMessageEnd) {
-            return true; // If any match is found, return true
+// Function to strip Markdown code blocks and parse JSON safely.
+function stripMarkdownCodeBlocks(text) {
+    // Check if the text starts and ends with code block markers
+    if (text.startsWith('```') && text.endsWith('```')) {
+        // Remove the starting and ending code block markers
+        text = text.slice(3, -3);
+        
+        // Remove the language specifier if present (e.g., 'json' or 'javascript')
+        const firstLineBreak = text.indexOf('\n');
+        if (firstLineBreak !== -1) {
+            const firstLine = text.slice(0, firstLineBreak).trim().toLowerCase();
+            if (firstLine === 'json' || firstLine.startsWith('javascript')) {
+                text = text.slice(firstLineBreak + 1);
+            }
         }
     }
+    return text.trim();
+}
 
-    // If no match is found after checking all messages, return false
+// Function to parse JSON response safely.
+function parseJSONResponse(text) {
+    try {
+        const stripped = stripMarkdownCodeBlocks(text);
+        return JSON.parse(stripped);
+    } catch (error) {
+        console.error('Failed to parse JSON response:', error);
+        return null;
+    }
+}
+
+// Function to track sent messages to avoid replying to own messages
+function trackSentMessage(message) {
+    lastSentMessages.push(message);
+    if (lastSentMessages.length > 10) {
+        lastSentMessages.shift();
+    }
+}
+
+/**
+ * Checks if the incoming message ends with any of the last sent messages.
+ * @param {string} message - The incoming message.
+ * @returns {boolean} True if there is a match; otherwise, false.
+ */
+function messageEndsMatchLastSent(message) {
+    for (let sentMessage of lastSentMessages) {
+        if (message.endsWith(sentMessage)) {
+            return true;
+        }
+    }
     return false;
 }
 
-// Add this function to handle tool usage
-function handleToolUsage(tool, args) {
-    if (tool.startsWith('/')) {
-        const command = args ? `${tool} ${args}` : tool;
-        bot.chat(command);
-        return null;
-    }
-    return `Error: Unknown tool command ${tool}`;
-}
-
-// Modify this function to handle both script commands and commands from commands.json
+/**
+ * Handles the usage of a command.
+ * @param {string} command - The command to execute.
+ * @param {string} args - The arguments for the command.
+ * @returns {Promise<string|null>} The result of command execution or an error message.
+ */
 async function handleCommandUsage(command, args) {
+    console.log(`Handling command usage: ${command} with args: ${args}`);
     // Remove leading '/' if present
     const normalizedCommand = command.startsWith('/') ? command.slice(1) : command;
 
     // Check if the command exists in the loaded scripts
     if (bot.scriptCommands && typeof bot.scriptCommands[normalizedCommand] === 'object' && typeof bot.scriptCommands[normalizedCommand].execute === 'function') {
         try {
+            console.log(`Executing script command: ${normalizedCommand}`);
             const result = await bot.scriptCommands[normalizedCommand].execute(bot, args);
+            console.log(`Script command result: ${result}`);
             return result;
         } catch (error) {
+            console.error(`Error executing script command: ${error.message}`);
             return `Error: ${error.message}`;
         }
     }
@@ -328,20 +301,27 @@ async function handleCommandUsage(command, args) {
     if (foundCommand) {
         // If the command is found in commands.json, execute it
         const fullCommand = args ? `/${normalizedCommand} ${args}` : `/${normalizedCommand}`;
+        console.log(`Executing JSON command: ${fullCommand}`);
         bot.chat(fullCommand);
-        return null;
+        return `Executed command: ${fullCommand}`;
     }
 
+    console.log(`Unknown command: ${command}`);
     return `Error: Unknown command ${command}`;
 }
 
-// Script Management System
-const scriptsPath = path.join(__dirname, 'scripts');
+// Set up readline interface to accept terminal input
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
 
-// Ensure the scripts directory exists
-if (!fs.existsSync(scriptsPath)) {
-    fs.mkdirSync(scriptsPath);
-}
+rl.on('line', (line) => {
+  bot.chat(line);
+  trackSentMessage(line);
+});
+
+console.log('Mineflayer bot setup complete. Type in the terminal to send messages in-game.');
 
 /**
  * Loads all scripts from the scripts directory.
@@ -380,26 +360,3 @@ function loadScripts() {
 
 // Load scripts on startup
 loadScripts();
-
-/**
- * Strips Markdown code block markers if present.
- * @param {string} text - The text to process.
- * @returns {string} The text with code block markers removed if they were present.
- */
-function stripMarkdownCodeBlocks(text) {
-    // Check if the text starts and ends with code block markers
-    if (text.startsWith('```') && text.endsWith('```')) {
-        // Remove the starting and ending code block markers
-        text = text.slice(3, -3);
-        
-        // Remove the language specifier if present (e.g., 'json')
-        const firstLineBreak = text.indexOf('\n');
-        if (firstLineBreak !== -1) {
-            const firstLine = text.slice(0, firstLineBreak).trim();
-            if (firstLine === 'json') {
-                text = text.slice(firstLineBreak + 1);
-            }
-        }
-    }
-    return text.trim();
-}

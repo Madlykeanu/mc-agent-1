@@ -1,4 +1,5 @@
 const axios = require('axios');
+const util = require('util');
 
 /**
  * Sends a POST request to the language model server and returns the response.
@@ -8,7 +9,8 @@ const axios = require('axios');
  */
 async function sendPostRequest(url, payload) {
     try {
-        console.log('Sending POST request with payload:', JSON.stringify(payload, null, 2));
+        console.log('Sending POST request with payload:');
+        console.log(util.inspect(payload, { depth: null, colors: true }));
         
         const response = await axios.post(url, payload, {
             headers: {

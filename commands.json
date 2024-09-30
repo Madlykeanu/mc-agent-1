@@ -41,7 +41,7 @@
   },
   {
     "name": "town",
-    "description": "Check your current town.",
+    "description": "Check your current town info.",
     "usage": "/town",
     "args": []
   },
@@ -52,5 +52,10 @@
     "args": [
       "playername"
     ]
+  },
+  {
+    "name": "t join",
+    "description": "Join a town using its name. You must not already be in a town.",
+    "usage": "/t join [townname]"
   }
 ]
