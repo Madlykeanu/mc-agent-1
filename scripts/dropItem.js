@@ -49,17 +49,6 @@ module.exports = {
                 });
             }
         },
-        inventory: {
-            description: "Lists items in the bot's inventory",
-            usage: "inventory",
-            execute: function(bot) {
-                const items = bot.inventory.items();
-                if (items.length === 0) {
-                    return "The inventory is empty.";
-                }
-                const itemList = items.map(item => `${item.name} x${item.count}`).join(', ');
-                return `Inventory: ${itemList}`;
-            }
-        }
+        
     }
 };
