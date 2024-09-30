@@ -4,12 +4,16 @@ const path = require('path');
 const httpRequestHandler = require('./httpRequestHandler');
 const readline = require('readline');
 const { buildPayload, addNewCommand } = require('./payloadBuilder');
+const { pathfinder } = require('mineflayer-pathfinder');
 
 // Load configuration
 const configPath = path.join(__dirname, 'config.json');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8')); 
 
 let bot = mineflayer.createBot(config.bot);
+
+// Initialize pathfinder
+bot.loadPlugin(pathfinder);
 
 // Flags and tracking variables
 let canRespondToMessages = false;
@@ -204,15 +208,75 @@ function handleToolUsage(tool, args) {
     return `Error: Unknown tool command ${tool}`;
 }
 
-// Make sure this function is defined
+// Modify this function to handle both script commands and commands from commands.json
 function handleCommandUsage(command, args) {
-    if (command.startsWith('/')) {
-        const fullCommand = args ? `${command} ${args}` : command;
+    // Remove leading '/' if present
+    const normalizedCommand = command.startsWith('/') ? command.slice(1) : command;
+
+    // Check if the command exists in the loaded scripts
+    if (bot.scriptCommands && typeof bot.scriptCommands[normalizedCommand] === 'object' && typeof bot.scriptCommands[normalizedCommand].execute === 'function') {
+        return bot.scriptCommands[normalizedCommand].execute(bot, args);  // Pass 'bot' as the first argument
+    }
+
+    // Check if the command exists in commands.json
+    const jsonCommands = JSON.parse(fs.readFileSync(path.join(__dirname, 'commands.json'), 'utf8'));
+    const foundCommand = jsonCommands.find(cmd => cmd.name === normalizedCommand);
+
+    if (foundCommand) {
+        // If the command is found in commands.json, execute it
+        const fullCommand = args ? `/${normalizedCommand} ${args}` : `/${normalizedCommand}`;
         bot.chat(fullCommand);
         return null;
     }
+
     return `Error: Unknown command ${command}`;
 }
+
+// Script Management System
+const scriptsPath = path.join(__dirname, 'scripts');
+
+// Ensure the scripts directory exists
+if (!fs.existsSync(scriptsPath)) {
+    fs.mkdirSync(scriptsPath);
+}
+
+/**
+ * Loads all scripts from the scripts directory.
+ */
+function loadScripts() {
+    return new Promise((resolve, reject) => {
+        bot.scriptCommands = {}; // Object to store script commands
+
+        fs.readdir(scriptsPath, (err, files) => {
+            if (err) {
+                console.error('Error reading scripts directory:', err);
+                reject(err);
+                return;
+            }
+
+            files.forEach(file => {
+                if (path.extname(file) === '.js') {
+                    const script = require(path.join(scriptsPath, file));
+                    if (typeof script.init === 'function') {
+                        script.init(bot);
+                        console.log(`Loaded script: ${file}`);
+
+                        // Register script commands
+                        if (script.commands) {
+                            Object.assign(bot.scriptCommands, script.commands);
+                        }
+                    }
+                }
+            });
+
+            console.log('All scripts loaded');
+            resolve();
+        });
+    });
+}
+
+// Load scripts on startup
+loadScripts();
 
 /**
  * Strips Markdown code block markers if present.

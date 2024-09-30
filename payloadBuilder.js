@@ -7,7 +7,10 @@ const fs = require('fs');
 const path = require('path');
 const config = require('./config.json');
 
-// Rename loadCommands to loadCommands
+/**
+ * Loads commands from commands.json.
+ * @returns {Array} Array of command objects.
+ */
 function loadCommands() {
   const commandsPath = path.join(__dirname, 'commands.json');
   try {
@@ -16,6 +19,39 @@ function loadCommands() {
     return JSON.parse(data);
   } catch (error) {
     console.error(`[loadCommands] Error loading commands: ${error.message}`);
+    return [];
+  }
+}
+
+/**
+ * Loads script commands from the scripts directory.
+ * @returns {Array} Array of script command objects.
+ */
+function loadScriptCommands() {
+  const scriptsPath = path.join(__dirname, 'scripts');
+  const scriptCommands = [];
+
+  try {
+    const files = fs.readdirSync(scriptsPath);
+    files.forEach(file => {
+      if (path.extname(file) === '.js') {
+        const scriptPath = path.join(scriptsPath, file);
+        const script = require(scriptPath);
+        if (script.commands) {
+          Object.entries(script.commands).forEach(([name, func]) => {
+            scriptCommands.push({
+              name,
+              description: func.description || `Script command from ${file}`,
+              usage: func.usage || `${name} [args]`
+            });
+          });
+        }
+      }
+    });
+    console.log(`[loadScriptCommands] Successfully loaded ${scriptCommands.length} script commands`);
+    return scriptCommands;
+  } catch (error) {
+    console.error(`[loadScriptCommands] Error loading script commands: ${error.message}`);
     return [];
   }
 }
@@ -36,10 +72,11 @@ function normalizeCommandName(name) {
  * @returns {Object} The payload object for the chat model request.
  */
 function buildPayload(message, messageHistory) {
-  // Load commands before each prompt
   const commands = loadCommands();
+  const scriptCommands = loadScriptCommands();
+  const allCommands = [...commands, ...scriptCommands];
 
-  const commandsDescription = commands.map(command => 
+  const commandsDescription = allCommands.map(command => 
     `${command.name}: ${command.description}. Usage: ${command.usage}`
   ).join('\n');
 
@@ -59,7 +96,9 @@ Always include all fields in your JSON response, using null for newCommand, comm
 
 Provide detailed thoughts that show your decision-making process, including why you chose to respond or not respond.
 
-Important: You can use the "newCommand" field to add new commands or update existing ones if you learn new information about how they work. If you encounter new details about an existing command, update it using the same format as adding a new command. This helps keep your knowledge of commands up-to-date.`;
+Important: You can use the "newCommand" field to add new commands or update existing ones if you learn new information about how they work. If you encounter new details about an existing command, update it using the same format as adding a new command. This helps keep your knowledge of commands up-to-date.
+
+The bot can execute various commands, including those loaded from scripts. Refer to the available commands list for details on what the bot can do.`;
 
   return {
     model: config.languageModel.model,
