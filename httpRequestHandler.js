@@ -17,7 +17,7 @@ async function sendPostRequest(url, payload) {
             },
         });
         
-        console.log('Response data:', JSON.stringify(response.data, null, 2));
+        //console.log('Response data:', JSON.stringify(response.data, null, 2));
         return response.data;
     } catch (error) {
         // axios encapsulates errors in an 'error.response' object

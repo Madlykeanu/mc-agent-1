@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const httpRequestHandler = require('./httpRequestHandler');
 const readline = require('readline');
-const { buildPayload, addNewCommand } = require('./payloadBuilder');
+const { buildPayload, addNewCommand, buildScriptPayload } = require('./payloadBuilder');
 const { pathfinder } = require('mineflayer-pathfinder');
 
 // Load configuration
@@ -69,7 +69,43 @@ bot.on('message', async (jsonMsg) => {
     newMessages.push(message);
 });
 
-// New function to process batched messages
+// Function to create a new script from description
+async function createAndLoadScript(scriptCode, commandName) {
+    const scriptsDir = path.join(__dirname, 'scripts');
+    const scriptName = `${commandName}.js`;
+    const scriptPath = path.join(scriptsDir, scriptName);
+
+    try {
+        // Remove code block markers and language identifier
+        let cleanedScriptCode = scriptCode.replace(/^```javascript\s*/, '').replace(/```\s*$/, '');
+        
+        // Further clean up any remaining markdown artifacts
+        cleanedScriptCode = cleanedScriptCode.replace(/^```\s*/, '').trim();
+
+        fs.writeFileSync(scriptPath, cleanedScriptCode);
+        console.log(`New script '${scriptName}' created successfully.`);
+
+        // Dynamically load the new script
+        delete require.cache[require.resolve(scriptPath)]; // Clear the module cache
+        const newScript = require(scriptPath);
+        if (typeof newScript.init === 'function') {
+            newScript.init(bot);
+            console.log(`Initialized script: ${scriptName}`);
+        }
+
+        if (newScript.commands) {
+            Object.assign(bot.scriptCommands, newScript.commands);
+            console.log(`Registered commands from script: ${scriptName}`);
+        }
+
+        return `Script '${scriptName}' created and loaded successfully.`;
+    } catch (error) {
+        console.error(`Failed to create script '${scriptName}':`, error);
+        return `Error: Failed to create script '${scriptName}'. ${error.message}`;
+    }
+}
+
+// Update the processBatchedMessages function to handle createScript
 async function processBatchedMessages() {
     if (newMessages.length === 0) return;
 
@@ -91,14 +127,67 @@ async function processBatchedMessages() {
 
             // Strip Markdown code block markers if present
             const strippedContent = stripMarkdownCodeBlocks(messageContent);
-            console.log(`Original AI response: ${messageContent}`);
+            //console.log(`Original AI response: ${messageContent}`);
             console.log(`Stripped AI response: ${strippedContent}`);
 
             try {
                 const jsonResponse = JSON.parse(strippedContent);
-                console.log(`AI Thought: ${jsonResponse.thought}`);
+                
 
-                // **Process newCommand regardless of shouldRespond**
+                // Handle createScript
+                if (jsonResponse.createScript && jsonResponse.createScript.create) {
+                    const { description, commandName, args } = jsonResponse.createScript;
+
+                    if (description && commandName) {
+                        // Collect existing scripts as examples
+                        const existingScripts = ['scripts/dropItem.js', 'scripts/followPlayer.js'];
+
+                        // Build script payload
+                        const scriptPayload = buildScriptPayload(description, commandName, existingScripts);
+
+                        // Send script generation request to AI
+                        const scriptResponse = await httpRequestHandler.sendPostRequest(config.languageModel.url, scriptPayload);
+
+                        if (scriptResponse.choices && scriptResponse.choices[0].message) {
+                            const scriptContent = scriptResponse.choices[0].message.content.trim();
+
+                            // Execute the newly generated script
+                            const scriptResult = await createAndLoadScript(scriptContent, commandName);
+                            messageHistory.push(`System: ${scriptResult}`);
+                            
+                            // Inform the AI about the new script
+                            messageHistory.push(`System: New script '${commandName}' has been created and loaded.`);
+                        } else {
+                            console.error('Invalid script generation response:', scriptResponse);
+                            messageHistory.push(`System: Error generating script.`);
+                        }
+                    } else {
+                        console.error('createScript.create is true but missing description or commandName.');
+                        messageHistory.push(`System: Error creating script - Missing description or command name.`);
+                    }
+
+                    // **NEW CODE ADDED HERE**
+                    // Execute the newly created command with the provided arguments
+                    if (args && Array.isArray(args) && args.length > 0) {
+                        // Convert args array to a space-separated string
+                        const argsString = args.join(' ');
+                        console.log(`Executing newly created command '${commandName}' with arguments: ${argsString}`);
+
+                        // Execute the command
+                        const commandResult = await handleCommandUsage(commandName, argsString);
+
+                        if (commandResult && commandResult.startsWith("Error:")) {
+                            console.error(`Error executing command '${commandName}': ${commandResult}`);
+                            messageHistory.push(`System: ${commandResult}`);
+                        } else {
+                            console.log(`Command '${commandName}' executed successfully with arguments: ${argsString}`);
+                            messageHistory.push(`System: Command '${commandName}' executed successfully.`);
+                        }
+                    }
+                    // **END OF NEW CODE**
+                }
+
+                // Handle newCommand
                 if (jsonResponse.newCommand) {
                     try {
                         console.log(`Attempting to add/update command: ${JSON.stringify(jsonResponse.newCommand)}`);

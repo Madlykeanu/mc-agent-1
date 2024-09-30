@@ -47,7 +47,7 @@
   },
   {
     "name": "town kick",
-    "description": "Kick a player from your town. Only usable by the mayor or players with the required permission.",
+    "description": "Kick a player from your town. Requires town mayor role or command permission.",
     "usage": "/town kick [playername]",
     "args": [
       "playername"
