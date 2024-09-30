@@ -26,39 +26,6 @@ function loadCommands() {
 }
 
 /**
- * Loads script commands from the scripts directory.
- * @returns {Array} Array of script command objects.
- */
-function loadScriptCommands() {
-  const scriptsPath = path.join(__dirname, 'scripts');
-  const scriptCommands = [];
-
-  try {
-    const files = fs.readdirSync(scriptsPath);
-    files.forEach(file => {
-      if (path.extname(file) === '.js') {
-        const scriptPath = path.join(scriptsPath, file);
-        const script = require(scriptPath);
-        if (script.commands) {
-          Object.entries(script.commands).forEach(([name, func]) => {
-            scriptCommands.push({
-              name,
-              description: func.description || `Script command from ${file}`,
-              usage: func.usage || `${name} [args]`
-            });
-          });
-        }
-      }
-    });
-    console.log(`[loadScriptCommands] Successfully loaded ${scriptCommands.length} script commands`);
-    return scriptCommands;
-  } catch (error) {
-    console.error(`[loadScriptCommands] Error loading script commands: ${error.message}`);
-    return [];
-  }
-}
-
-/**
  * Normalizes command names by removing the leading slash.
  * @param {string} name - The command name to normalize.
  * @returns {string} The normalized command name.
@@ -78,10 +45,8 @@ function buildPayload(message, messageHistory, bot) {
   console.log(`[buildPayload] Bot object:`, bot ? 'defined' : 'undefined');
 
   const commands = loadCommands();
-  const scriptCommands = loadScriptCommands();
-  const allCommands = [...commands, ...scriptCommands];
 
-  const commandsDescription = allCommands.map(command => 
+  const commandsDescription = commands.map(command => 
     `${command.name}: ${command.description}. Usage: ${command.usage}`
   ).join('\n');
 
@@ -106,14 +71,14 @@ Position: x=${formatCoordinate(playerStats.position.x)}, y=${formatCoordinate(pl
 Yaw: ${playerStats.yaw !== null ? playerStats.yaw.toFixed(2) : 'N/A'}, Pitch: ${playerStats.pitch !== null ? playerStats.pitch.toFixed(2) : 'N/A'}
 
 Equipped items:
-Hand: ${playerStats.equipped.hand}
-Helmet: ${playerStats.equipped.armor.helmet}
-Chestplate: ${playerStats.equipped.armor.chestplate}
-Leggings: ${playerStats.equipped.armor.leggings}
-Boots: ${playerStats.equipped.armor.boots}
+Hand: ${formatEquippedItem(playerStats.equipped.hand)}
+Helmet: ${formatEquippedItem(playerStats.equipped.armor.helmet)}
+Chestplate: ${formatEquippedItem(playerStats.equipped.armor.chestplate)}
+Leggings: ${formatEquippedItem(playerStats.equipped.armor.leggings)}
+Boots: ${formatEquippedItem(playerStats.equipped.armor.boots)}
 
 Inventory:
-${playerStats.inventory.map(item => `${item.name} x${item.count}`).join(', ')}
+${playerStats.inventory.map(formatInventoryItem).join('\n')}
 `;
 
   const environmentMessage = `
@@ -276,14 +241,14 @@ Position: x=${playerStats.position.x.toFixed(2)}, y=${playerStats.position.y.toF
 Yaw: ${playerStats.yaw.toFixed(2)}, Pitch: ${playerStats.pitch.toFixed(2)}
 
 Equipped items:
-Hand: ${playerStats.equipped.hand}
-Helmet: ${playerStats.equipped.armor.helmet}
-Chestplate: ${playerStats.equipped.armor.chestplate}
-Leggings: ${playerStats.equipped.armor.leggings}
-Boots: ${playerStats.equipped.armor.boots}
+Hand: ${formatEquippedItem(playerStats.equipped.hand)}
+Helmet: ${formatEquippedItem(playerStats.equipped.armor.helmet)}
+Chestplate: ${formatEquippedItem(playerStats.equipped.armor.chestplate)}
+Leggings: ${formatEquippedItem(playerStats.equipped.armor.leggings)}
+Boots: ${formatEquippedItem(playerStats.equipped.armor.boots)}
 
 Inventory:
-${playerStats.inventory.map(item => `${item.name} x${item.count}`).join(', ')}
+${playerStats.inventory.map(formatInventoryItem).join('\n')}
 `;
 
   const environmentMessage = `
@@ -335,6 +300,29 @@ ${scriptContents}
     temperature: config.languageModel.temperature,
     max_tokens: config.languageModel.max_tokens
   };
+}
+
+function formatEquippedItem(item) {
+  if (!item) return 'None';
+  let result = `${item.displayName} (${item.name})`;
+  if (item.enchants && item.enchants.length > 0) {
+    result += ` [${item.enchants.map(e => `${e.name} ${e.lvl}`).join(', ')}]`;
+  }
+  if (item.durability !== undefined) {
+    result += ` Durability: ${item.durability}`;
+  }
+  return result;
+}
+
+function formatInventoryItem(item) {
+  let result = `${item.displayName} (${item.name}) x${item.count}`;
+  if (item.enchants && item.enchants.length > 0) {
+    result += ` [${item.enchants.map(e => `${e.name} ${e.lvl}`).join(', ')}]`;
+  }
+  if (item.durability !== undefined) {
+    result += ` Durability: ${item.durability}`;
+  }
+  return result;
 }
 
 module.exports = { buildPayload, addNewCommand, buildScriptPayload };

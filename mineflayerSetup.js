@@ -203,9 +203,17 @@ async function processBatchedMessages() {
 
                 if (jsonResponse.shouldRespond) {
                     if (jsonResponse.command) {
-                        const commandResult = handleCommandUsage(jsonResponse.command, jsonResponse.args);
-                        if (commandResult && commandResult.startsWith("Error:")) {
-                            console.error(commandResult);
+                        try {
+                            const commandResult = await handleCommandUsage(jsonResponse.command, jsonResponse.args);
+                            if (commandResult) {
+                                if (typeof commandResult === 'string' && commandResult.startsWith("Error:")) {
+                                    console.error(commandResult);
+                                } else {
+                                    console.log("Command executed successfully:", commandResult);
+                                }
+                            }
+                        } catch (error) {
+                            console.error(`Error executing command: ${error.message}`);
                         }
                     }
 
