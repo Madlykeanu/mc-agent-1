@@ -1,6 +1,6 @@
 {
   "bot": {
-    "host": "join.earthmc.net",
+    "host": "localhost",
     "port": 25565,
     "username": "madlykeanu@gmail.com",
     "auth": "microsoft",

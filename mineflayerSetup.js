@@ -306,23 +306,20 @@ async function createAndLoadScript(scriptCode, description) {
             console.error(`Failed to execute temporary script (Attempt ${attempts + 1}/${maxAttempts}):`, error);
             console.error(`Error details:`, error.stack);
 
-            if (attempts < maxAttempts - 1) {
-                // If not the last attempt, try to fix the script
-                const fixedScript = await fixScript(scriptCode, error.message, description);
-                if (fixedScript) {
-                    scriptCode = fixedScript;
-                    attempts++;
-                } else {
-                    return `Error: Failed to fix and execute temporary script after ${attempts + 1} attempts.`;
-                }
+            // Always try to fix the script, regardless of the error type
+            const fixedScript = await fixScript(scriptCode, error.message, description);
+            if (fixedScript) {
+                scriptCode = fixedScript;
+                attempts++;
             } else {
-                return `Error: Failed to execute temporary script after ${maxAttempts} attempts. ${error.message}`;
+                return `Error: Failed to fix and execute temporary script after ${attempts + 1} attempts.`;
             }
         }
     }
+    return `Error: Failed to execute temporary script after ${maxAttempts} attempts.`;
 }
 
-// Add this new function to fix the script
+// Update the fixScript function
 async function fixScript(scriptCode, errorMessage, description) {
     try {
         const scriptPayload = buildScriptPayload(description, bot, scriptCode, errorMessage);
