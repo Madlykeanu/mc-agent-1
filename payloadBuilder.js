@@ -1,6 +1,6 @@
 /**
  * payloadBuilder.js
- * This module is responsible for building the payload for the chat model requests.
+ * This module is responsible for building the payload for the chat model requests..
  */
 
 const fs = require('fs');
