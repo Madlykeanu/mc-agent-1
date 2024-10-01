@@ -56,8 +56,13 @@ console.log('Environment variables loaded:');
 console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? 'Set' : 'Not set');
 console.log('ANTHROPIC_API_KEY:', process.env.ANTHROPIC_API_KEY ? 'Set' : 'Not set');
 
+// Flag to track if the bot has spawned
+let botHasSpawned = false;
+
 // Listen for the spawn event
-bot.on('spawn', () => {
+bot.once('spawn', () => {
+    console.log('Bot has spawned in the game.');
+    botHasSpawned = true;
     setTimeout(() => {
         canRespondToMessages = true;
     }, 2000);
@@ -65,6 +70,29 @@ bot.on('spawn', () => {
     bot.mcData = minecraftData(bot.version);
 });
 
+// Create the readline interface
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
+
+// Set up the readline listener after the bot has spawned
+rl.on('line', (line) => {
+  if (botHasSpawned) {
+    console.log(`Attempting to send chat message: ${line}`);
+    if (typeof bot.chat === 'function') {
+      bot.chat(line);
+      console.log(`Chat message sent: ${line}`);
+      trackSentMessage(line);
+    } else {
+      console.error('bot.chat is not a function');
+    }
+  } else {
+    console.log('Bot has not spawned yet. Please wait.');
+  }
+});
+
+console.log('Bot is ready to receive chat commands from the terminal.');
 
 // New variables for message batching
 let newMessages = [];
@@ -407,18 +435,7 @@ async function handleCommandUsage(command, args) {
     return `Error: Unknown command ${command}`;
 }
 
-// Set up readline interface to accept terminal input
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-});
-
-rl.on('line', (line) => {
-  bot.chat(line);
-  trackSentMessage(line);
-});
-
-console.log('Mineflayer bot setup complete. Type in the terminal to send messages in-game.');
+console.log('Mineflayer bot setup complete. Bot will be ready to chat after spawning in-game.');
 
 /**
  * Loads all scripts from the scripts directory.
