@@ -15,7 +15,7 @@ function getEnvironmentInfo(bot) {
         };
     }
 
-    const viewDistance = 50; // Increased from 20 to 50
+    const viewDistance = 50;
     const visiblePlayers = [];
     const visibleMobs = [];
     const visibleBlocks = [];
@@ -48,17 +48,20 @@ function getEnvironmentInfo(bot) {
         }
     });
 
-    // Ray casting to find visible blocks
-    const { position, yaw, pitch } = bot.entity;
+    // Ray casting to find visible blocks in 360 degrees
+    const { position } = bot.entity;
     const eyePosition = position.offset(0, bot.entity.height, 0);
-    const horizontalFov = Math.PI * 1.5; // Increased to 270 degrees
-    const verticalFov = Math.PI * 0.75; // Increased to 135 degrees
+    const horizontalSteps = 64; // Increased for higher resolution
+    const verticalSteps = 32;   // Increased for higher resolution
 
-    for (let vAngle = -verticalFov / 2; vAngle <= verticalFov / 2; vAngle += Math.PI / 32) {
-        for (let hAngle = -horizontalFov / 2; hAngle <= horizontalFov / 2; hAngle += Math.PI / 32) {
-            const x = Math.cos(yaw + hAngle) * Math.cos(pitch + vAngle);
-            const y = Math.sin(pitch + vAngle);
-            const z = Math.sin(yaw + hAngle) * Math.cos(pitch + vAngle);
+    for (let vStep = 0; vStep < verticalSteps; vStep++) {
+        const vAngle = (Math.PI * vStep) / verticalSteps - Math.PI / 2;
+        for (let hStep = 0; hStep < horizontalSteps; hStep++) {
+            const hAngle = (Math.PI * 2 * hStep) / horizontalSteps;
+            
+            const x = Math.cos(hAngle) * Math.cos(vAngle);
+            const y = Math.sin(vAngle);
+            const z = Math.sin(hAngle) * Math.cos(vAngle);
             const direction = new Vec3(x, y, z);
             
             const block = bot.world.raycast(eyePosition, direction, viewDistance);
@@ -68,7 +71,6 @@ function getEnvironmentInfo(bot) {
                     visibleBlocks.push({
                         name: block.name,
                         position: blockKey,
-                        relativePosition: `${block.position.x - Math.floor(position.x)},${block.position.y - Math.floor(position.y)},${block.position.z - Math.floor(position.z)}`,
                         isSolid: block.boundingBox === 'block',
                         canBeWalkedOn: block.boundingBox === 'block' || block.boundingBox === 'step',
                         canWalkThrough: block.boundingBox === 'empty'
@@ -81,7 +83,7 @@ function getEnvironmentInfo(bot) {
     return {
         visiblePlayers,
         visibleMobs,
-        visibleBlocks: visibleBlocks.slice(0, 100) // Limit to 100 blocks to prevent overwhelming the AI
+        visibleBlocks: visibleBlocks.slice(0, 200) // Increased limit to 200 blocks
     };
 }
 

@@ -121,6 +121,13 @@ async function processBatchedMessages() {
         const endTime = Date.now();
         console.log(`Received response from AI model after ${endTime - startTime}ms`);
         
+        // Log the input token count
+        if (response.usage && response.usage.total_tokens) {
+            console.log(`Total tokens: ${response.usage.total_tokens}`);
+        } else {
+            console.log('Total token count not available in the response');
+        }
+
         if (response.choices && response.choices[0].message) {
             console.log('Processing AI response...');
             const jsonResponse = parseJSONResponse(response.choices[0].message.content);

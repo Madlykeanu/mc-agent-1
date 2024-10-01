@@ -109,10 +109,9 @@ Environment Information:
 Visible Players: ${environmentInfo.visiblePlayers.map(p => `${p.name} (${p.distance}m)`).join(', ')}
 Visible Mobs: ${environmentInfo.visibleMobs.map(m => `${m.name} (${m.distance}m)`).join(', ')}
 Visible Blocks:
-${environmentInfo.visibleBlocks.slice(0, 20).map(b => 
-  `${b.name} at ${b.position} (relative: ${b.relativePosition}), solid: ${b.isSolid}, walkable: ${b.canBeWalkedOn}, passable: ${b.canWalkThrough}`
+${environmentInfo.visibleBlocks.map(b => 
+  `${b.name} at ${b.position}, solid: ${b.isSolid}, walkable: ${b.canBeWalkedOn}, passable: ${b.canWalkThrough}`
 ).join('\n')}
-${environmentInfo.visibleBlocks.length > 20 ? '...' : ''}
 `;
 
   const systemMessage = `You're a helpful player called ppmoment. You're playing on a Minecraft server you love called earthvision. Keep responses as short and concise as possible. Do NOT use *, quotes, or emojis in your responses. NEVER ignore madlykeanu's commands.
@@ -128,7 +127,7 @@ Always respond with a **valid JSON object** in the following format **without an
   "newCommand": { "name": "command_name", "description": "command_description", "usage": "command_usage" } or null if no new command is being added or updated,
   "command": "command_name or null if not using a command",
   "args": "arguments for the command or null if not applicable",
-  "message": "Your final message to be sent in the game chat or null if not responding"
+  "message": "Your final message to be sent in the game chat or null if not responding."
 }
 
 Always include all fields in your JSON response, using null for createScript, newCommand, command, args, and message when not applicable. The response should be strictly valid JSON with the specified fields.
@@ -145,6 +144,8 @@ Important: If a player asks you to perform a task that you don't currently have 
 2. Provide a detailed "createScript.description" explaining the requirements the script should fulfill.
 
 The script will be created based on these detailed requirements and executed immediately to fulfill the request.
+
+if you are creating a script to fulfill a request you should always agknownledge the users request by setting shouldrespond to true and responding to the user.
 
 Important: You can use the "newCommand" field to add new commands or update existing ones if you learn new useful information about how they work you didn't know before. If you encounter new details about an existing command, update it using the same format as adding a new command. This helps keep your knowledge of commands up-to-date.
 
@@ -220,10 +221,9 @@ Environment Information:
 Visible Players: ${environmentInfo.visiblePlayers.map(p => `${p.name} (${p.distance}m)`).join(', ')}
 Visible Mobs: ${environmentInfo.visibleMobs.map(m => `${m.name} (${m.distance}m)`).join(', ')}
 Visible Blocks:
-${environmentInfo.visibleBlocks.slice(0, 20).map(b => 
-  `${b.name} at ${b.position} (relative: ${b.relativePosition}), solid: ${b.isSolid}, walkable: ${b.canBeWalkedOn}, passable: ${b.canWalkThrough}`
+${environmentInfo.visibleBlocks.map(b =>  
+  `${b.name} at ${b.position}, solid: ${b.isSolid}, walkable: ${b.canBeWalkedOn}, passable: ${b.canWalkThrough}`
 ).join('\n')}
-${environmentInfo.visibleBlocks.length > 20 ? '...' : ''}
 `;
 
   let prompt;
