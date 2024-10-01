@@ -32,7 +32,6 @@ function getPlayerStats(bot) {
                     enchants: item.enchants,
                     durability: item.durability,
                     stackSize: item.stackSize,
-                    // Add information about the item's location in the inventory
                     location: getInventoryLocation(index)
                 };
             } else {
@@ -86,17 +85,17 @@ function getEquippedItemDetails(item) {
     };
 }
 
-// Add this new function to determine the inventory location
+// Update the getInventoryLocation function
 function getInventoryLocation(slotIndex) {
     if (slotIndex >= 36 && slotIndex <= 44) {
-        return `Hotbar ${slotIndex - 35}`;
+        return `Hotbar ${slotIndex - 35} (Slot ${slotIndex})`;
     } else if (slotIndex >= 9 && slotIndex <= 35) {
-        return `Main Inventory ${slotIndex - 8}`;
+        return `Main Inventory ${slotIndex - 8} (Slot ${slotIndex})`;
     } else if (slotIndex >= 5 && slotIndex <= 8) {
         const armorPieces = ['Boots', 'Leggings', 'Chestplate', 'Helmet'];
-        return `Armor: ${armorPieces[slotIndex - 5]}`;
+        return `Armor: ${armorPieces[slotIndex - 5]} (Slot ${slotIndex})`;
     } else if (slotIndex === 45) {
-        return 'Offhand';
+        return 'Offhand (Slot 45)';
     } else {
         return `Slot ${slotIndex}`;
     }

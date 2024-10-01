@@ -6,6 +6,7 @@ const readline = require('readline');
 const esprima = require('esprima'); // Ensure esprima is installed
 const { buildPayload, addNewCommand, buildScriptPayload } = require('./payloadBuilder');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
+const minecraftData = require('minecraft-data');
 
 // Load configuration
 const configPath = path.join(__dirname, 'config.json');
@@ -13,6 +14,9 @@ const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
 // Define scriptsPath
 const scriptsPath = path.join(__dirname, 'scripts');
+
+// Add this near the top of the file with other path definitions
+const tempScriptTestPath = path.join(__dirname, 'tempscripttest');
 
 let bot = mineflayer.createBot(config.bot);
 
@@ -34,12 +38,16 @@ let messageHistory = [];
 // Temporary scripts storage for AI-generated scripts
 const tempScripts = {};
 
+// Add this near the top of the file, after other variable declarations
+let debugMode = true;
+
 // Listen for the spawn event
 bot.on('spawn', () => {
     setTimeout(() => {
         canRespondToMessages = true;
     }, 2000);
     ignoreNextPpmomentMessage = true; // Reset the flag on spawn
+    bot.mcData = minecraftData(bot.version);
 });
 
 
@@ -207,8 +215,12 @@ async function createAndLoadScript(scriptCode) {
         esprima.parseScript(scriptCode);
 
         // Execute the script in memory without saving to the scripts folder
-        const scriptFunction = new Function('bot', scriptCode);
-        scriptFunction(bot);
+        const scriptFunction = new Function('bot', `
+            return (async () => {
+                ${scriptCode}
+            })();
+        `);
+        await scriptFunction(bot);
         console.log(`Temporary script executed successfully.`);
         return `Temporary script executed successfully.`;
     } catch (error) {
@@ -360,3 +372,45 @@ function loadScripts() {
 
 // Load scripts on startup
 loadScripts();
+
+// Update this function to handle temporary script execution from tempscripttest folder
+async function executeTempScript(scriptName) {
+  try {
+    const scriptPath = path.join(tempScriptTestPath, `${scriptName}.js`);
+    if (fs.existsSync(scriptPath)) {
+      const scriptContent = fs.readFileSync(scriptPath, 'utf8');
+      return await createAndLoadScript(scriptContent);
+    } else {
+      return 'Error: Script not found in tempscripttest folder.';
+    }
+  } catch (error) {
+    console.error('Error executing temp script:', error);
+    return `Error: ${error.message}`;
+  }
+}
+
+// Update the chat event listener
+bot.on('chat', async (username, message) => {
+  if (username === bot.username) return;
+
+  if (debugMode && message.toLowerCase() === 'test') {
+    const scriptResult = await executeTempScript('test');
+    bot.chat(scriptResult);
+  }
+
+  // ... rest of your existing chat handling code ...
+});
+
+// Add this command to toggle debug mode
+bot.on('chat', (username, message) => {
+  if (message.toLowerCase() === 'toggle debug') {
+    debugMode = !debugMode;
+    bot.chat(`Debug mode ${debugMode ? 'enabled' : 'disabled'}.`);
+  }
+});
+
+// You might want to add this to ensure the tempscripttest folder exists
+if (!fs.existsSync(tempScriptTestPath)) {
+  fs.mkdirSync(tempScriptTestPath);
+  console.log('Created tempscripttest folder');
+}

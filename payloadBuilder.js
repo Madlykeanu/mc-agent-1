@@ -237,11 +237,16 @@ ${environmentMessage}
 - Use the provided bot state and environment information to inform your script creation.
 - Include necessary functions for head rotation, block placement, and other relevant actions based on the current bot capabilities.
 - IMPORTANT: The script should be tailored precisely to execute ONLY the specific task in the description and nothing else. It will be deleted after execution, so do not include any long-term functionality or setup.
-- Focus on immediate execution of the task without any additional features or future considerations
+- Focus on immediate execution of the task without any additional features or future considerations.
+- Use 'bot.mcData' instead of 'mcData' for accessing Minecraft data.
+- Wrap your code in an async function and call it immediately to allow for async operations.
 
 ### New Script:
 \`\`\`javascript
-`;
+(async function() {
+  // Your script code here
+})();
+\`\`\``;
 
   return {
     model: config.languageModel.model,
@@ -279,7 +284,7 @@ function formatEquippedItem(item) {
  * @returns {string} Formatted inventory item string.
  */
 function formatInventoryItem(item) {
-  let result = `${item.displayName} (${item.name}) x${item.count}`;
+  let result = `${item.displayName} (${item.name}) x${item.count} - ${item.location}`;
   if (item.enchants && item.enchants.length > 0) {
     result += ` [${item.enchants.map(e => `${e.name} ${e.lvl}`).join(', ')}]`;
   }
