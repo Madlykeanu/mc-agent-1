@@ -15,11 +15,7 @@ function getEnvironmentInfo(bot) {
         };
     }
 
-    const viewDistance = 32; // Maximum view distance
-    const rayStep = 1; // Step size for ray tracing
-    const verticalFov = Math.PI / 2; // Vertical field of view (90 degrees)
-    const horizontalFov = Math.PI * 2 / 3; // Horizontal field of view (120 degrees)
-
+    const viewDistance = 20;
     const visiblePlayers = [];
     const visibleMobs = [];
     const visibleBlocks = [];
@@ -52,8 +48,12 @@ function getEnvironmentInfo(bot) {
         }
     });
 
-    // Ray tracing for visible blocks
-    const { yaw, pitch } = bot.entity;
+    // Ray casting to find visible blocks
+    const { position, yaw, pitch } = bot.entity;
+    const eyePosition = position.offset(0, bot.entity.height, 0);
+    const horizontalFov = Math.PI; // 180 degrees
+    const verticalFov = Math.PI / 2; // 90 degrees
+
     for (let vAngle = -verticalFov / 2; vAngle <= verticalFov / 2; vAngle += Math.PI / 16) {
         for (let hAngle = -horizontalFov / 2; hAngle <= horizontalFov / 2; hAngle += Math.PI / 16) {
             const x = Math.cos(yaw + hAngle) * Math.cos(pitch + vAngle);
@@ -61,13 +61,17 @@ function getEnvironmentInfo(bot) {
             const z = Math.sin(yaw + hAngle) * Math.cos(pitch + vAngle);
             const direction = new Vec3(x, y, z);
             
-            const block = bot.world.raycast(bot.entity.position.offset(0, bot.entity.height, 0), direction, viewDistance);
+            const block = bot.world.raycast(eyePosition, direction, viewDistance);
             if (block) {
                 const existingBlock = visibleBlocks.find(b => b.position === `${block.position.x},${block.position.y},${block.position.z}`);
                 if (!existingBlock) {
                     visibleBlocks.push({
                         name: block.name,
-                        position: `${block.position.x},${block.position.y},${block.position.z}`
+                        position: `${block.position.x},${block.position.y},${block.position.z}`,
+                        relativePosition: `${block.position.x - Math.floor(position.x)},${block.position.y - Math.floor(position.y)},${block.position.z - Math.floor(position.z)}`,
+                        isSolid: block.boundingBox === 'block',
+                        canBeWalkedOn: block.boundingBox === 'block' || block.boundingBox === 'step',
+                        canWalkThrough: block.boundingBox === 'empty'
                     });
                 }
             }

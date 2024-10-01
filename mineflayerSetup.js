@@ -7,6 +7,11 @@ const esprima = require('esprima'); // Ensure esprima is installed
 const { buildPayload, addNewCommand, buildScriptPayload } = require('./payloadBuilder');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const minecraftData = require('minecraft-data');
+const { Vec3 } = require('vec3'); // Import Vec3
+
+// Make Vec3 and goals globally available
+global.Vec3 = Vec3;
+global.goals = goals;
 
 // Load configuration
 const configPath = path.join(__dirname, 'config.json');
@@ -214,13 +219,38 @@ async function createAndLoadScript(scriptCode) {
         // Validate JavaScript syntax
         esprima.parseScript(scriptCode);
 
-        // Execute the script in memory without saving to the scripts folder
-        const scriptFunction = new Function('bot', `
-            return (async () => {
-                ${scriptCode}
-            })();
-        `);
-        await scriptFunction(bot);
+        // Create a sandbox with allowed modules and global objects
+        const sandbox = {
+            require: (moduleName) => {
+                switch (moduleName) {
+                    case 'vec3':
+                        return require('vec3');
+                    case 'mineflayer-pathfinder':
+                        return require('mineflayer-pathfinder');
+                    default:
+                        // Allow Node.js built-in modules
+                        return require(moduleName);
+                }
+            },
+            bot,
+            Vec3,
+            goals,
+            console,
+            setTimeout,
+            setInterval,
+            clearTimeout,
+            clearInterval,
+            Promise,
+            // Add other global objects as needed
+            ...global
+        };
+
+        // Execute the script in the sandbox
+        const vm = require('vm');
+        const script = new vm.Script(scriptCode);
+        const context = vm.createContext(sandbox);
+        await script.runInContext(context);
+        
         console.log(`Temporary script executed successfully.`);
         return `Temporary script executed successfully.`;
     } catch (error) {
@@ -394,7 +424,7 @@ bot.on('chat', async (username, message) => {
   if (username === bot.username) return;
 
   if (debugMode && message.toLowerCase() === 'test') {
-    const scriptResult = await executeTempScript('test');
+    const scriptResult = await executeTempScript('test2');
     bot.chat(scriptResult);
   }
 

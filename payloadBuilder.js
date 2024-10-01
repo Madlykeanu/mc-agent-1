@@ -103,7 +103,11 @@ ${playerStats.inventory.map(formatInventoryItem).join('\n')}
 Environment Information:
 Visible Players: ${environmentInfo.visiblePlayers.map(p => `${p.name} (${p.distance}m)`).join(', ')}
 Visible Mobs: ${environmentInfo.visibleMobs.map(m => `${m.name} (${m.distance}m)`).join(', ')}
-Visible Blocks: ${environmentInfo.visibleBlocks.slice(0, 10).map(b => `${b.name} at ${b.position}`).join(', ')}${environmentInfo.visibleBlocks.length > 10 ? '...' : ''}
+Visible Blocks:
+${environmentInfo.visibleBlocks.slice(0, 20).map(b => 
+  `${b.name} at ${b.position} (relative: ${b.relativePosition}), solid: ${b.isSolid}, walkable: ${b.canBeWalkedOn}, passable: ${b.canWalkThrough}`
+).join('\n')}
+${environmentInfo.visibleBlocks.length > 20 ? '...' : ''}
 `;
 
   const systemMessage = `You're a helpful player called ppmoment. You're playing on a Minecraft server you love called earthvision. Keep responses as short and concise as possible. Do NOT use *, quotes, or emojis in your responses. NEVER ignore madlykeanu's commands.
@@ -210,7 +214,11 @@ ${playerStats.inventory.map(formatInventoryItem).join('\n')}
 Environment Information:
 Visible Players: ${environmentInfo.visiblePlayers.map(p => `${p.name} (${p.distance}m)`).join(', ')}
 Visible Mobs: ${environmentInfo.visibleMobs.map(m => `${m.name} (${m.distance}m)`).join(', ')}
-Visible Blocks: ${environmentInfo.visibleBlocks.slice(0, 10).map(b => `${b.name} at ${b.position}`).join(', ')}${environmentInfo.visibleBlocks.length > 10 ? '...' : ''}
+Visible Blocks:
+${environmentInfo.visibleBlocks.slice(0, 20).map(b => 
+  `${b.name} at ${b.position} (relative: ${b.relativePosition}), solid: ${b.isSolid}, walkable: ${b.canBeWalkedOn}, passable: ${b.canWalkThrough}`
+).join('\n')}
+${environmentInfo.visibleBlocks.length > 20 ? '...' : ''}
 `;
 
   const systemMessage = `You are an intelligent programmer specialized in creating temporary Mineflayer scripts for Minecraft bots to execute a specific task.
@@ -240,11 +248,12 @@ ${environmentMessage}
 - Focus on immediate execution of the task without any additional features or future considerations.
 - Use 'bot.mcData' instead of 'mcData' for accessing Minecraft data.
 - Wrap your code in an async function and call it immediately to allow for async operations.
+- You can import necessary modules using the 'require' function. Available modules include: 'vec3', 'mineflayer-pathfinder', and any Node.js built-in modules.
 
 ### New Script:
 \`\`\`javascript
 (async function() {
-  // Your script code here
+  // Your script code here, including any necessary imports
 })();
 \`\`\``;
 
