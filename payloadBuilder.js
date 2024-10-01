@@ -8,6 +8,11 @@ const path = require('path');
 const config = require('./config.json');
 const { getPlayerStats } = require('./playerStats');
 const { getEnvironmentInfo } = require('./environmentInfo');
+const Anthropic = require('@anthropic-ai/sdk');
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
 
 /**
  * Loads commands from commands.json.
@@ -115,7 +120,7 @@ ${environmentInfo.visibleBlocks.length > 20 ? '...' : ''}
 Always respond with a **valid JSON object** in the following format **without any comments or annotations**:
 {
   "thought": "Your chain of thought or reasoning (be detailed but concise)",
-  "shouldRespond": true or false, you can decide whether to respond to a message. Ignore server messages, irrelevant chatter, or messages not directed at you.
+  "shouldRespond": true or false, you can decide whether to respond to a message. Ignore server messages, irrelevant chatter, always respond to messages that seem to be directed at you.
   "createScript": { 
     "create": true or false, indicating whether a new script should be created, 
     "description": "description of the task the script should accomplish to be created if create is true"
@@ -181,7 +186,7 @@ The bot can execute various commands, including those loaded from scripts. Refer
 }
 
 /**
- * Builds the payload for generating new scripts.
+ * Builds the payload for generating new scripts using Claude.
  * @param {string} scriptDescription - Detailed description of the script to be created.
  * @param {Object} bot - The bot object containing inventory and stats.
  * @returns {Object} The payload object for the script generation request.
@@ -221,7 +226,7 @@ ${environmentInfo.visibleBlocks.slice(0, 20).map(b =>
 ${environmentInfo.visibleBlocks.length > 20 ? '...' : ''}
 `;
 
-  const systemMessage = `You are an intelligent programmer specialized in creating temporary Mineflayer scripts for Minecraft bots to execute a specific task.
+  const prompt = `You are an intelligent programmer, specialized in creating temporary Mineflayer scripts for Minecraft bots to execute a specific task.
 
 ### Task:
 You need to create a new script based on the following description. The script should execute ONLY the specific task described and nothing else. It will be deleted immediately after execution.
@@ -232,7 +237,7 @@ ${scriptDescription}
 ### Current Bot State:
 ${statsMessage}
 
-### Current Environment:
+### Environment:
 ${environmentMessage}
 
 ### Requirements:
@@ -255,18 +260,16 @@ ${environmentMessage}
 (async function() {
   // Your script code here, including any necessary imports
 })();
-\`\`\``;
+\`\`\`
+
+Generate the script based on the given description and requirements.`;
 
   return {
-    model: config.languageModel.model,
+    model: config.codingModel.model,
+    max_tokens: config.codingModel.max_tokens,
     messages: [
-      {
-        role: "system",
-        content: systemMessage
-      }
-    ],
-    temperature: config.languageModel.temperature,
-    max_tokens: config.languageModel.max_tokens
+      { role: "user", content: prompt }
+    ]
   };
 }
 
@@ -369,4 +372,4 @@ function loadScriptCommands() {
   return scriptCommands;
 }
 
-module.exports = { buildPayload, addNewCommand, buildScriptPayload, loadScriptCommands };
+module.exports = { buildPayload, addNewCommand, buildScriptPayload, loadScriptCommands, anthropic };

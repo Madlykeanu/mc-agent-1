@@ -4,7 +4,7 @@ const path = require('path');
 const httpRequestHandler = require('./httpRequestHandler');
 const readline = require('readline');
 const esprima = require('esprima'); // Ensure esprima is installed
-const { buildPayload, addNewCommand, buildScriptPayload } = require('./payloadBuilder');
+const { buildPayload, addNewCommand, buildScriptPayload, anthropic } = require('./payloadBuilder');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const minecraftData = require('minecraft-data');
 const { Vec3 } = require('vec3'); // Import Vec3
@@ -45,6 +45,16 @@ const tempScripts = {};
 
 // Add this near the top of the file, after other variable declarations
 let debugMode = true;
+
+// Initialize Anthropic client
+// const anthropicClient = new Anthropic({
+//   apiKey: process.env.ANTHROPIC_API_KEY,
+// });
+
+// Add this near the top of the file, after other imports
+console.log('Environment variables loaded:');
+console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? 'Set' : 'Not set');
+console.log('ANTHROPIC_API_KEY:', process.env.ANTHROPIC_API_KEY ? 'Set' : 'Not set');
 
 // Listen for the spawn event
 bot.on('spawn', () => {
@@ -124,6 +134,14 @@ async function processBatchedMessages() {
             console.log('JSON response parsed successfully.');
             console.log('AI response:', JSON.stringify(jsonResponse, null, 2));
 
+            // Handle shouldRespond and message immediately
+            if (jsonResponse.shouldRespond && jsonResponse.message) {
+                console.log(`Sending message immediately: ${jsonResponse.message}`);
+                bot.chat(jsonResponse.message);
+                trackSentMessage(jsonResponse.message);
+                
+            }
+
             // Handle command execution
             if (jsonResponse.command) {
                 console.log(`Executing command: ${jsonResponse.command}`);
@@ -142,27 +160,27 @@ async function processBatchedMessages() {
                 const { description } = jsonResponse.createScript;
 
                 if (description) {
-                    // Removed existingScripts as it's no longer needed
-                    // const existingScripts = ['scripts/dropItem.js', 'scripts/followPlayer.js']; // Remove or comment out this line
+                    const scriptPayload = buildScriptPayload(description, bot);
 
-                    // Build the script payload without existingScripts
-                    const scriptPayload = buildScriptPayload(description, bot); // Updated line
+                    try {
+                        const msg = await anthropic.messages.create(scriptPayload);
 
-                    // Send script generation request to AI
-                    const scriptResponse = await httpRequestHandler.sendPostRequest(config.languageModel.url, scriptPayload);
+                        if (msg.content && msg.content.length > 0) {
+                            const scriptContent = stripMarkdownCodeBlocks(msg.content[0].text);
 
-                    if (scriptResponse.choices && scriptResponse.choices[0].message) {
-                        const scriptContent = stripMarkdownCodeBlocks(scriptResponse.choices[0].message.content.trim());
+                            // Execute the newly generated temporary script
+                            const scriptResult = await createAndLoadScript(scriptContent);
+                            messageHistory.push(`System: ${scriptResult}`);
 
-                        // Execute the newly generated temporary script
-                        const scriptResult = await createAndLoadScript(scriptContent);
-                        messageHistory.push(`System: ${scriptResult}`);
-
-                        // Inform the AI about the new temporary script
-                        messageHistory.push(`System: Temporary script has been executed.`);
-                    } else {
-                        console.error('Invalid script generation response:', scriptResponse);
-                        messageHistory.push(`System: Error generating script.`);
+                            // Inform the AI about the new temporary script
+                            messageHistory.push(`System: Temporary script has been executed.`);
+                        } else {
+                            console.error('Invalid script generation response:', msg);
+                            messageHistory.push(`System: Error generating script.`);
+                        }
+                    } catch (error) {
+                        console.error('Error generating script:', error);
+                        messageHistory.push(`System: Error generating script - ${error.message}`);
                     }
                 } else {
                     console.error('createScript.create is true but missing description.');
@@ -182,14 +200,6 @@ async function processBatchedMessages() {
                     console.error('Error adding/updating command:', error);
                     messageHistory.push(`System: Error adding/updating command: ${error.message}`);
                 }
-            }
-
-            // Handle shouldRespond and message
-            if (jsonResponse.shouldRespond && jsonResponse.message) {
-                console.log(`Sending message: ${jsonResponse.message}`);
-                bot.chat(jsonResponse.message);
-                trackSentMessage(jsonResponse.message);
-                messageHistory.push(`System: Sent message - ${jsonResponse.message}`);
             }
         } else {
             console.error('Invalid AI response structure:', response);
