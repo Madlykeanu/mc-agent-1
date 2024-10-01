@@ -1,4 +1,5 @@
 - ~~add a way for the ai to update descriptions of tools/command if it comes across new information about the command~~
+- add more relevant context for when the ai tries to fix a script that comes across and error, for example if the script has been attempted to be fixed multiple times it should include all the previous errors and attempted fixes to have the best chance of actually solving it instead of potentially going in loops
 - add feedback for the ai when it tries to use a tool/commands that dosnt exist in its tool library yet
 - maybe the ai can test if the command actually works before saving it?
 - maybe instead of creating the response before the command executes(in the message field) when it uses one it can execute the command then come up with a response after so if theres an error or something it can tell you about it or try a different way 
