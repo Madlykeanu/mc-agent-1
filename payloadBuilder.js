@@ -123,7 +123,7 @@ Always respond with a **valid JSON object** in the following format **without an
   "shouldRespond": true or false, you can decide whether to respond to a message. Ignore server messages, irrelevant chatter, always respond to messages that seem to be directed at you.
   "createScript": { 
     "create": true or false, indicating whether a new script should be created, 
-    "description": "description of the task the script should accomplish to be created if create is true"
+    "description": "Precise and detailed requirements for the script. Focus on exactly what the script should accomplish, step by step. Be very specific about the desired outcome and any constraints. take into account the bot's current state and environment."
   },
   "newCommand": { "name": "command_name", "description": "command_description", "usage": "command_usage" } or null if no new command is being added or updated,
   "command": "command_name or null if not using a command",
@@ -144,7 +144,7 @@ Important: If a player asks you to perform a task that you don't currently have 
 1. Set "createScript.create" to true.
 2. Provide a detailed "createScript.description" explaining the requirements the script should fulfill.
 
-The script will be created and executed immediately to fulfill the request.
+The script will be created based on these detailed requirements and executed immediately to fulfill the request.
 
 Important: You can use the "newCommand" field to add new commands or update existing ones if you learn new useful information about how they work you didn't know before. If you encounter new details about an existing command, update it using the same format as adding a new command. This helps keep your knowledge of commands up-to-date.
 
