@@ -191,7 +191,7 @@ The bot can execute various commands, including those loaded from scripts. Refer
  * @param {Object} bot - The bot object containing inventory and stats.
  * @returns {Object} The payload object for the script generation request.
  */
-function buildScriptPayload(scriptDescription, bot) {
+function buildScriptPayload(scriptDescription, bot, originalScript = null, errorMessage = null) {
   // Get player stats and environment info
   const playerStats = getPlayerStats(bot);
   const environmentInfo = getEnvironmentInfo(bot);
@@ -226,7 +226,57 @@ ${environmentInfo.visibleBlocks.slice(0, 20).map(b =>
 ${environmentInfo.visibleBlocks.length > 20 ? '...' : ''}
 `;
 
-  const prompt = `You are an intelligent programmer, specialized in creating temporary Mineflayer scripts for Minecraft bots to execute a specific task.
+  let prompt;
+
+  if (originalScript && errorMessage) {
+    prompt = `You are an intelligent programmer, specialized in fixing Mineflayer scripts for Minecraft bots.
+
+### Task:
+You need to fix the following script that encountered an error. The script should execute ONLY the specific task described and nothing else.
+
+### Script Description:
+${scriptDescription}
+
+### Original Script:
+\`\`\`javascript
+${originalScript}
+\`\`\`
+
+### Error Message:
+${errorMessage}
+
+### Current Bot State:
+${statsMessage}
+
+### Environment:
+${environmentMessage}
+
+### Requirements:
+- Return **only** the fixed JavaScript code for the script.
+- Do **not** include any explanations, comments, or additional text.
+- The script will be executed in the context of an existing bot instance. Do NOT create a new bot or import mineflayer.
+- Use the existing 'bot' object, which is already available in the script's scope.
+- Do not include any event listeners like 'bot.on('spawn', ...)'. The script should execute immediately.
+- Ensure the script follows a clear and efficient structure.
+- Use the provided bot state and environment information to inform your script creation.
+- Include necessary functions for head rotation, block placement, and other relevant actions based on the current bot capabilities.
+- IMPORTANT: The script should be tailored precisely to execute ONLY the specific task in the description and nothing else. It will be deleted after execution, so do not include any long-term functionality or setup.
+- Focus on immediate execution of the task without any additional features or future considerations.
+- Use 'bot.mcData' instead of 'mcData' for accessing Minecraft data.
+- Wrap your code in an async function and call it immediately to allow for async operations.
+- You can import necessary modules using the 'require' function. Available modules include: 'vec3', 'mineflayer-pathfinder', and any Node.js built-in modules.
+
+### Fixed Script:
+\`\`\`javascript
+(async function() {
+  // Your fixed script code here, including any necessary imports
+})();
+\`\`\`
+
+Fix the script based on the given error message, description, and requirements.`;
+  } else {
+    // Use the existing prompt for creating a new script
+    prompt = `You are an intelligent programmer, specialized in creating temporary Mineflayer scripts for Minecraft bots to execute a specific task.
 
 ### Task:
 You need to create a new script based on the following description. The script should execute ONLY the specific task described and nothing else. It will be deleted immediately after execution.
@@ -263,6 +313,7 @@ ${environmentMessage}
 \`\`\`
 
 Generate the script based on the given description and requirements.`;
+  }
 
   return {
     model: config.codingModel.model,

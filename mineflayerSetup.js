@@ -169,7 +169,7 @@ async function processBatchedMessages() {
                             const scriptContent = stripMarkdownCodeBlocks(msg.content[0].text);
 
                             // Execute the newly generated temporary script
-                            const scriptResult = await createAndLoadScript(scriptContent);
+                            const scriptResult = await createAndLoadScript(scriptContent, description);
                             messageHistory.push(`System: ${scriptResult}`);
 
                             // Inform the AI about the new temporary script
@@ -220,53 +220,91 @@ async function processBatchedMessages() {
 setInterval(processBatchedMessages, 5000);
 
 // Function to create and execute a temporary script
-async function createAndLoadScript(scriptCode) {
+async function createAndLoadScript(scriptCode, description) {
     console.log("Received script code:");
     console.log(scriptCode);
     console.log("End of received script code");
 
-    try {
-        // Validate JavaScript syntax
-        esprima.parseScript(scriptCode);
+    let attempts = 0;
+    const maxAttempts = 10;
 
-        // Create a sandbox with allowed modules and global objects
-        const sandbox = {
-            require: (moduleName) => {
-                switch (moduleName) {
-                    case 'vec3':
-                        return require('vec3');
-                    case 'mineflayer-pathfinder':
-                        return require('mineflayer-pathfinder');
-                    default:
-                        // Allow Node.js built-in modules
-                        return require(moduleName);
+    while (attempts < maxAttempts) {
+        try {
+            // Validate JavaScript syntax
+            esprima.parseScript(scriptCode);
+
+            // Create a sandbox with allowed modules and global objects
+            const sandbox = {
+                require: (moduleName) => {
+                    switch (moduleName) {
+                        case 'vec3':
+                            return require('vec3');
+                        case 'mineflayer-pathfinder':
+                            return require('mineflayer-pathfinder');
+                        default:
+                            // Allow Node.js built-in modules
+                            return require(moduleName);
+                    }
+                },
+                bot,
+                Vec3,
+                goals,
+                console,
+                setTimeout,
+                setInterval,
+                clearTimeout,
+                clearInterval,
+                Promise,
+                // Add other global objects as needed
+                ...global
+            };
+
+            // Execute the script in the sandbox
+            const vm = require('vm');
+            const script = new vm.Script(scriptCode);
+            const context = vm.createContext(sandbox);
+            await script.runInContext(context);
+            
+            console.log(`Temporary script executed successfully.`);
+            return `Temporary script executed successfully.`;
+        } catch (error) {
+            console.error(`Failed to execute temporary script (Attempt ${attempts + 1}/${maxAttempts}):`, error);
+            console.error(`Error details:`, error.stack);
+
+            if (attempts < maxAttempts - 1) {
+                // If not the last attempt, try to fix the script
+                const fixedScript = await fixScript(scriptCode, error.message, description);
+                if (fixedScript) {
+                    scriptCode = fixedScript;
+                    attempts++;
+                } else {
+                    return `Error: Failed to fix and execute temporary script after ${attempts + 1} attempts.`;
                 }
-            },
-            bot,
-            Vec3,
-            goals,
-            console,
-            setTimeout,
-            setInterval,
-            clearTimeout,
-            clearInterval,
-            Promise,
-            // Add other global objects as needed
-            ...global
-        };
+            } else {
+                return `Error: Failed to execute temporary script after ${maxAttempts} attempts. ${error.message}`;
+            }
+        }
+    }
+}
 
-        // Execute the script in the sandbox
-        const vm = require('vm');
-        const script = new vm.Script(scriptCode);
-        const context = vm.createContext(sandbox);
-        await script.runInContext(context);
-        
-        console.log(`Temporary script executed successfully.`);
-        return `Temporary script executed successfully.`;
+// Add this new function to fix the script
+async function fixScript(scriptCode, errorMessage, description) {
+    try {
+        const scriptPayload = buildScriptPayload(description, bot, scriptCode, errorMessage);
+        const msg = await anthropic.messages.create(scriptPayload);
+
+        if (msg.content && msg.content.length > 0) {
+            const fixedScriptContent = stripMarkdownCodeBlocks(msg.content[0].text);
+            console.log("Fixed script received:");
+            console.log(fixedScriptContent);
+            return fixedScriptContent;
+        } else {
+            console.error('Invalid script fix response:', msg);
+            return null;
+        }
     } catch (error) {
-        console.error(`Failed to execute temporary script:`, error);
-        console.error(`Error details:`, error.stack);
-        return `Error: Failed to execute temporary script. ${error.message}`;
+        console.error('Error fixing script:', error);
+        return null;
     }
 }
 
@@ -415,11 +453,13 @@ loadScripts();
 
 // Update this function to handle temporary script execution from tempscripttest folder
 async function executeTempScript(scriptName) {
+    // add a description for the test script here, this important for the AI to understand what the script is supposed to do so if there is an error it can fix it
+    const scriptDescription = ('This is a test script. It should execute a specific task and nothing else. It will be deleted immediately after execution.');
   try {
     const scriptPath = path.join(tempScriptTestPath, `${scriptName}.js`);
     if (fs.existsSync(scriptPath)) {
       const scriptContent = fs.readFileSync(scriptPath, 'utf8');
-      return await createAndLoadScript(scriptContent);
+      return await createAndLoadScript(scriptContent, scriptDescription);
     } else {
       return 'Error: Script not found in tempscripttest folder.';
     }
