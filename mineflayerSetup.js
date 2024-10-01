@@ -478,7 +478,7 @@ loadScripts();
 // Update this function to handle temporary script execution from tempscripttest folder
 async function executeTempScript(scriptName) {
     // add a description for the test script here, this important for the AI to understand what the script is supposed to do so if there is an error it can fix it
-    const scriptDescription = ('This is a test script. It should execute a specific task and nothing else. It will be deleted immediately after execution.');
+    const scriptDescription = ('description of the test script.');
   try {
     const scriptPath = path.join(tempScriptTestPath, `${scriptName}.js`);
     if (fs.existsSync(scriptPath)) {
@@ -502,18 +502,11 @@ bot.on('chat', async (username, message) => {
     bot.chat(scriptResult);
   }
 
-  // ... rest of your existing chat handling code ...
 });
 
-// Add this command to toggle debug mode
-bot.on('chat', (username, message) => {
-  if (message.toLowerCase() === 'toggle debug') {
-    debugMode = !debugMode;
-    bot.chat(`Debug mode ${debugMode ? 'enabled' : 'disabled'}.`);
-  }
-});
 
-// You might want to add this to ensure the tempscripttest folder exists
+
+// ensure the tempscripttest folder exists
 if (!fs.existsSync(tempScriptTestPath)) {
   fs.mkdirSync(tempScriptTestPath);
   console.log('Created tempscripttest folder');
