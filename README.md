@@ -1,6 +1,6 @@
 # mc-agent-1
 
-experimental minecraft-agent
+setup instructions soon
 
 
 
