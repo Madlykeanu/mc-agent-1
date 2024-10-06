@@ -1,6 +1,6 @@
 # mc-agent-1
 
-excuse my garbage code i made this in like a week just as an experiment
+excuse my garbage code i made this in like a week as an experiment
 
 
 
