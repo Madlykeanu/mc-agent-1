@@ -1,3 +1,11 @@
+# mc agent 1
+
+experimental minecraft agent
+
+
+
+
+
 - ~~add a way for the ai to update descriptions of tools/command if it comes across new information about the command~~
 
 - some kind of planning framework? currently it will try to generate a script for any task even very complex goals(for example asking it to try to get to the nether when it just spawned in a new world) it should break down complex tasks into smaller subtasks if the goal is complex(for going to the nether it could maybe have subgoals of collect wood, craft basic tools, gather food etc), and when it completes the task it should evaluate its progress and update the plan if neccessary, we should use the smartest model possible for this. it should then create scripts to complete the smaller tasks one by one until the goal is completed
