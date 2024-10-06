@@ -1,6 +1,5 @@
 # mc-agent-1
 
-setup instructions soon
 
 
 
