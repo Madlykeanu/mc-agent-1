@@ -4,6 +4,7 @@ excuse my garbage code i made most of this in like a week as an experiment
 
 basically writes its own mineflayer scripts to control itself based on what you tell it to do.
 still very basic atm and cannot perform complex tasks(eg "goto the nether" when it just spawned in with nothing) but it can do relatively simple things like get you wood or mine for you semi reliably.
+this is basically just a proof of concept/experiment so expect loads of bugs
 
 i dont plan to develop this further as i have another mc agent im working on that will be completely rewriten to be better with what i learned from this project.
 
