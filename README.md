@@ -6,7 +6,7 @@ basically writes its own mineflayer scripts to control itself based on what you 
 still very basic atm and cannot perform complex tasks(eg "goto the nether" when it just spawned in with nothing) but it can do relatively simple things like get you wood or mine for you semi reliably.
 this is basically just a proof of concept/experiment so expect loads of bugs if you try to run it
 
-i dont plan to develop this further as i have another mc agent im working on that will be completely rewriten to be better with what i learned from this project.
+i dont plan to develop this further as i have another mc agent im working on that will be completely rewritten to be better with what i learned from this project.
 
 todo:
 - ~~add a way for the ai to update descriptions of tools/command if it comes across new information about the command~~
